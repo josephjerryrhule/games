@@ -80,6 +80,31 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
+      // --- Icon Component using Lucide ---
+      const Icon = ({ name, size = 24, strokeWidth = 1.5, className = "" }) => {
+        const iconRef = useRef(null);
+
+        useEffect(() => {
+          if (iconRef.current && window.lucide) {
+            const iconElement = window.lucide.icons[name];
+            if (iconElement) {
+              iconRef.current.innerHTML = iconElement.toSvg({
+                width: size,
+                height: size,
+                "stroke-width": strokeWidth,
+              });
+            }
+          }
+        }, [name, size, strokeWidth]);
+
+        return (
+          <span
+            ref={iconRef}
+            className={`inline-flex items-center justify-center ${className}`}
+          />
+        );
+      };
+
       // --- Shared Components ---
 
       const MenuButton = ({ title, description, count, color, onClick }) => (
@@ -227,6 +252,9 @@
       }) => {
         const [copied, setCopied] = useState(false);
         const [showTabooSetup, setShowTabooSetup] = useState(false);
+        const [tabooSetupStep, setTabooSetupStep] = useState(1);
+        const [tabooTeamSize, setTabooTeamSize] = useState(2);
+        const [tabooRounds, setTabooRounds] = useState(3);
 
         const copyKey = () => {
           if (navigator.clipboard) {
@@ -239,6 +267,9 @@
         const handleGameSelect = (gameKey) => {
           if (gameKey === "TABOO") {
             setShowTabooSetup(true);
+            setTabooSetupStep(1); // Step 1: Team size, Step 2: Rounds
+            setTabooTeamSize(2);
+            setTabooRounds(3);
           } else {
             onStartGame(gameKey);
           }
@@ -248,32 +279,76 @@
           return (
             <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
               <div className="bg-rose-500/10 p-6 rounded-full border border-rose-500/20">
-                <span className="text-5xl">👥</span>
+                <span className="text-5xl">
+                  {tabooSetupStep === 1 ? "👥" : "🔄"}
+                </span>
               </div>
-              <div className="space-y-2">
-                <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
-                  Taboo Setup
-                </h1>
-                <p className="text-gray-400 font-bold text-sm">
-                  How many players are on each team?
-                </p>
-              </div>
-              <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => onStartGame("TABOO", { teamSize: n })}
-                    className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
+
+              {tabooSetupStep === 1 && (
+                <>
+                  <div className="space-y-2">
+                    <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                      Team Size
+                    </h1>
+                    <p className="text-gray-400 font-bold text-sm">
+                      Players per team:
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
+                    {[2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => {
+                          setTabooTeamSize(n);
+                          setTabooSetupStep(2);
+                        }}
+                        className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {tabooSetupStep === 2 && (
+                <>
+                  <div className="space-y-2">
+                    <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                      Rounds
+                    </h1>
+                    <p className="text-gray-400 font-bold text-sm">
+                      {tabooTeamSize} players per team × ? rounds
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-5 gap-3 w-full max-w-xs">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => {
+                          setTabooRounds(n);
+                          onStartGame("TABOO", {
+                            teamSize: tabooTeamSize,
+                            maxRounds: n,
+                          });
+                        }}
+                        className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <button
-                onClick={() => setShowTabooSetup(false)}
+                onClick={() => {
+                  if (tabooSetupStep === 2) setTabooSetupStep(1);
+                  else setShowTabooSetup(false);
+                }}
                 className="text-gray-500 uppercase font-black text-[10px] tracking-widest"
               >
-                Cancel
+                {tabooSetupStep === 2 ? "← Back" : "Cancel"}
               </button>
             </div>
           );
@@ -1832,16 +1907,28 @@
         const handleStartGame = (gameKey, options = {}) => {
           // Shuffle and Assign Teams
           // HOST IS EXCLUDED -> Only shuffle 'players' list
-
           const shuffled = [...players].sort(() => 0.5 - Math.random());
-          const half = Math.ceil(shuffled.length / 2);
-          const newTeams = {
-            1: shuffled.slice(0, half).map((p) => p.id),
-            2: shuffled.slice(half).map((p) => p.id),
-          };
+
+          let newTeams;
+          if (gameKey === "TABOO" && options.teamSize) {
+            // For Taboo: Assign up to teamSize players per team
+            const teamSize = options.teamSize;
+            newTeams = {
+              1: shuffled.slice(0, teamSize).map((p) => p.id),
+              2: shuffled.slice(teamSize, teamSize * 2).map((p) => p.id),
+            };
+          } else {
+            // Default: Split evenly
+            const half = Math.ceil(shuffled.length / 2);
+            newTeams = {
+              1: shuffled.slice(0, half).map((p) => p.id),
+              2: shuffled.slice(half).map((p) => p.id),
+            };
+          }
 
           // Game Specific Setup
-          const isCompetitive = gameKey === "THIRTY_SECONDS";
+          const isCompetitive =
+            gameKey === "THIRTY_SECONDS" || gameKey === "TABOO";
           const newPhase = isCompetitive ? "ready" : "playing";
 
           // Generate first card
@@ -1858,7 +1945,11 @@
             teams: newTeams,
             phase: newPhase,
             teamSize: options.teamSize || prev.teamSize,
+            maxRounds: options.maxRounds || 3,
             round: 1,
+            currentPlayerIndex: 0,
+            team1PlayerIndex: 0,
+            team2PlayerIndex: 0,
             turnScore: 0,
             dieRoll: 0,
             hasRolled: false,
@@ -2267,7 +2358,12 @@
                                   isRolling ? "die-animation" : ""
                                 }`}
                               >
-                                <span className="text-4xl text-black">🎲</span>
+                                <Icon
+                                  name="dice-3"
+                                  size={40}
+                                  strokeWidth={1.5}
+                                  className="text-black"
+                                />
                               </div>
                               <button
                                 onClick={rollDice}
