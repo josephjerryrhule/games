@@ -1,0 +1,2458 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <title>Ultimate Games Night</title>
+
+    <!-- External Libraries (CDNs) -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
+
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: black;
+        overscroll-behavior: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .no-select {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out forwards;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .die-animation {
+        animation: roll 0.6s ease-out;
+      }
+
+      @keyframes roll {
+        0% {
+          transform: rotate(0deg) scale(1);
+        }
+        25% {
+          transform: rotate(90deg) scale(1.1);
+        }
+        50% {
+          transform: rotate(180deg) scale(1.2);
+        }
+        75% {
+          transform: rotate(270deg) scale(1.1);
+        }
+        100% {
+          transform: rotate(360deg) scale(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      const Icon = ({ name, size = 24, className = "", fill = "none" }) => {
+        const iconRef = useRef(null);
+        useEffect(() => {
+          if (iconRef.current && window.lucide) {
+            const pascalName = name
+              .split("-")
+              .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+              .join("");
+            const iconData =
+              window.lucide.icons[pascalName] || window.lucide.icons[name];
+            if (iconData) {
+              const svg = document.createElementNS(
+                "http://www.w3.org/2000/svg",
+                "svg"
+              );
+              svg.setAttribute("width", size);
+              svg.setAttribute("height", size);
+              svg.setAttribute("viewBox", "0 0 24 24");
+              svg.setAttribute("fill", fill);
+              svg.setAttribute("stroke", "currentColor");
+              svg.setAttribute("stroke-width", "2.5");
+              svg.setAttribute("stroke-linecap", "round");
+              svg.setAttribute("stroke-linejoin", "round");
+              const classes = className.split(" ").filter(Boolean);
+              if (classes.length) svg.classList.add(...classes);
+
+              const renderNodes = (parent, children) => {
+                if (!children || !Array.isArray(children)) return;
+                children.forEach((node) => {
+                  if (!node || !Array.isArray(node)) return;
+                  const [tagName, attrs, subChildren] = node;
+                  const element = document.createElementNS(
+                    "http://www.w3.org/2000/svg",
+                    tagName
+                  );
+                  if (attrs && typeof attrs === "object") {
+                    Object.entries(attrs).forEach(([key, value]) =>
+                      element.setAttribute(key, value)
+                    );
+                  }
+                  if (subChildren) renderNodes(element, subChildren);
+                  parent.appendChild(element);
+                });
+              };
+              if (iconData[2] && Array.isArray(iconData[2]))
+                renderNodes(svg, iconData[2]);
+              iconRef.current.innerHTML = "";
+              iconRef.current.appendChild(svg);
+            }
+          }
+        }, [name, size, className, fill]);
+        return (
+          <div
+            ref={iconRef}
+            className={`inline-flex items-center justify-center ${className}`}
+          />
+        );
+      };
+
+      // --- Shared Components ---
+
+      const MenuButton = ({
+        title,
+        description,
+        count,
+        icon,
+        color,
+        onClick,
+      }) => (
+        <button
+          onClick={onClick}
+          className="w-full bg-gray-900 border border-gray-800 p-4 rounded-3xl flex items-center gap-4 hover:bg-gray-800 active:scale-95 transition-all group group-hover:border-emerald-500/50"
+        >
+          <div
+            className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}
+          >
+            <Icon name={icon} size={24} className="text-white" />
+          </div>
+          <div className="text-left flex-1">
+            <h3 className="text-white font-black text-lg uppercase italic tracking-tighter">
+              {title}
+            </h3>
+            <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wide">
+              {description}
+            </p>
+          </div>
+          {count !== undefined && (
+            <div className="bg-black/30 px-3 py-1 rounded-full text-white text-xs font-black">
+              {count}
+            </div>
+          )}
+        </button>
+      );
+
+      // --- New Screens ---
+
+      const LandingScreen = ({ onSetRole }) => (
+        <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-12 animate-fade-in no-select bg-black">
+          <header className="space-y-4">
+            <div className="inline-block p-6 bg-emerald-500/10 rounded-[2.5rem] border border-emerald-500/20 shadow-2xl mb-4">
+              <Icon name="gamepad-2" size={64} className="text-emerald-500" />
+            </div>
+            <div>
+              <h1 className="text-5xl font-black tracking-tighter italic text-white leading-none uppercase">
+                Ultimate
+              </h1>
+              <h1 className="text-5xl font-black tracking-tighter italic text-emerald-500 leading-none uppercase">
+                Games Night
+              </h1>
+            </div>
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">
+              Multiplayer Party Suite
+            </p>
+          </header>
+
+          <div className="w-full max-w-xs space-y-4">
+            <button
+              onClick={() => onSetRole("gm")}
+              className="w-full bg-emerald-500 text-black font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
+              Host Game
+            </button>
+            <button
+              onClick={() => onSetRole("player")}
+              className="w-full bg-gray-900 text-white border border-gray-800 font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-gray-800"
+            >
+              Join Game
+            </button>
+          </div>
+        </div>
+      );
+
+      const PlayerJoinScreen = ({ onJoin, onBack }) => {
+        const [roomKey, setRoomKey] = useState("");
+        const [playerName, setPlayerName] = useState("");
+        const [isJoining, setIsJoining] = useState(false);
+
+        const handleJoin = () => {
+          if (!roomKey || !playerName) return;
+          setIsJoining(true);
+          onJoin(roomKey.trim(), playerName.trim());
+        };
+
+        return (
+          <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
+            <button
+              onClick={onBack}
+              className="absolute top-6 left-6 p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800"
+            >
+              <Icon name="arrow-left" size={20} />
+            </button>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-black text-white italic tracking-tighter uppercase">
+                Join Room
+              </h1>
+              <p className="text-gray-500 font-bold text-xs uppercase tracking-widest">
+                Enter details to connect
+              </p>
+            </div>
+
+            <div className="w-full max-w-xs space-y-4">
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-4">
+                  Room Key
+                </label>
+                <input
+                  type="text"
+                  value={roomKey}
+                  onChange={(e) => setRoomKey(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-800 text-white font-bold p-4 rounded-2xl focus:outline-none focus:border-emerald-500 transition-colors text-center uppercase tracking-widest"
+                  placeholder="e.g. A1B2C"
+                />
+              </div>
+              <div className="space-y-1 text-left">
+                <label className="text-[10px] uppercase font-black text-gray-400 ml-4">
+                  Your Name
+                </label>
+                <input
+                  type="text"
+                  value={playerName}
+                  onChange={(e) => setPlayerName(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-800 text-white font-bold p-4 rounded-2xl focus:outline-none focus:border-emerald-500 transition-colors text-center uppercase tracking-wide"
+                  placeholder="Enter Name"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleJoin}
+              disabled={isJoining || !roomKey || !playerName}
+              className={`w-full max-w-xs py-5 rounded-3xl text-lg font-black uppercase tracking-tighter shadow-xl transition-all flex items-center justify-center gap-3 ${
+                isJoining
+                  ? "bg-gray-800 text-gray-500"
+                  : "bg-emerald-500 text-black active:scale-95"
+              }`}
+            >
+              {isJoining ? "Connecting..." : "Join Lobby"}
+            </button>
+          </div>
+        );
+      };
+
+      const LobbyScreen = ({
+        role,
+        roomKey,
+        players,
+        onStartGame,
+        onLeave,
+        statusMsg,
+      }) => {
+        const [copied, setCopied] = useState(false);
+
+        const copyKey = () => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(roomKey);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }
+        };
+
+        return (
+          <div className="h-screen flex flex-col p-6 animate-fade-in no-select">
+            <header className="flex justify-between items-center mb-8">
+              <button
+                onClick={onLeave}
+                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800"
+              >
+                <Icon name="log-out" size={20} />
+              </button>
+              <div className="bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                  {role === "gm" ? "HOSTING" : "PLAYER"}
+                </span>
+              </div>
+            </header>
+
+            <div className="flex-1 flex flex-col items-center gap-8">
+              {/* Room Key Section (Prominent for GM) */}
+              <div className="w-full max-w-lg text-center space-y-2">
+                <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest">
+                  Room Access Key
+                </p>
+                <div
+                  onClick={copyKey}
+                  className="bg-gray-900 border border-gray-800 p-6 rounded-[2rem] relative active:scale-95 transition-transform cursor-pointer group"
+                >
+                  <h2 className="text-4xl font-black text-white tracking-widest uppercase">
+                    {roomKey || "..."}
+                  </h2>
+                  <div className="absolute top-1/2 -translate-y-1/2 right-6 text-gray-600 group-hover:text-emerald-500 transition-colors">
+                    <Icon name={copied ? "check" : "copy"} size={20} />
+                  </div>
+                </div>
+                {copied && (
+                  <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest animate-pulse">
+                    Copied to clipboard!
+                  </p>
+                )}
+              </div>
+
+              {/* Players List */}
+              <div className="w-full max-w-xs flex-1 flex flex-col overflow-hidden">
+                <div className="flex items-center gap-3 mb-4">
+                  <Icon name="users" size={20} className="text-gray-400" />
+                  <h3 className="text-white font-black uppercase italic tracking-tighter">
+                    Players ({players.length})
+                  </h3>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                  {players.length === 0 ? (
+                    <div className="text-center p-8 border border-dashed border-gray-800 rounded-3xl">
+                      <p className="text-gray-600 font-bold text-xs uppercase tracking-wide">
+                        Waiting for players...
+                      </p>
+                    </div>
+                  ) : (
+                    players.map((p, i) => (
+                      <div
+                        key={i}
+                        className="bg-gray-900/50 p-4 rounded-2xl flex items-center justify-between border border-gray-800"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-white font-bold">{p.name}</span>
+                        </div>
+                        {/* Role badge if needed, currently assumes all joined are 'players' */}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Action Area */}
+              <div className="w-full max-w-xs pt-4">
+                {role === "gm" ? (
+                  <button
+                    onClick={onStartGame}
+                    className="w-full bg-emerald-500 text-black font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                  >
+                    Start Game Night
+                  </button>
+                ) : (
+                  <div className="text-center p-4 bg-gray-900 rounded-2xl border border-gray-800 animate-pulse">
+                    <p className="text-emerald-500 font-black text-xs uppercase tracking-widest">
+                      Waiting for Host...
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const GAMES_DATA = {
+        THIRTY_SECONDS: [
+          "Jollof Rice",
+          "Sarkodie",
+          "Accra Mall",
+          "Trotro",
+          "Kente Cloth",
+          "Stonebwoy",
+          "Black Star Square",
+          "Waakye",
+          "Kumasi",
+          "Dumsor",
+          "Shatta Wale",
+          "Cape Coast Castle",
+          "Banku",
+          "Pure Water",
+          "Nana Akufo-Addo",
+          "Kelewele",
+          "Jackie Appiah",
+          "Kotoka Airport",
+          "Takoradi",
+          "Shitor",
+          "Fufu",
+          "Kwame Nkrumah",
+          "Osu",
+          "Abedi Pele",
+          "Chale Wote",
+          "Kenkey",
+          "Yvonne Nelson",
+          "Labadi Beach",
+          "Tamale",
+          "Azonto",
+          "Red Red",
+          "John Mahama",
+          "Makola Market",
+          "Ho",
+          "Galamsey",
+          "Tuo Zaafi",
+          "Asamoah Gyan",
+          "Kakum Park",
+          "Koforidua",
+          "Bofrot",
+          "Sobolo",
+          "Majid Michel",
+          "Independence Arch",
+          "Sunyani",
+          "Momo",
+          "Palwine",
+          "Rebecca Akufo-Addo",
+          "National Theatre",
+          "Obuasi",
+          "Kente",
+          "Kontomire",
+          "D-Black",
+          "Elmina Castle",
+          "Bolgatanga",
+          "Gari Fortor",
+          "Ampesi",
+          "Efya",
+          "Mole National Park",
+          "Tarkwa",
+          "One-Man-Thousand",
+          "Kobi",
+          "Van Vicker",
+          "Aburi Gardens",
+          "Winneba",
+          "Slay Queen",
+          "Eto",
+          "Wendy Shay",
+          "Lake Volta",
+          "Ada",
+          "Koti",
+          "Light Soup",
+          "Kuami Eugene",
+          "Wli Falls",
+          "Bawku",
+          "Borga",
+          "Groundnut Soup",
+          "KiDi",
+          "Paga Crocodile Pond",
+          "Techiman",
+          "Trotro Mate",
+          "Mpo di",
+          "King Promise",
+          "Larambanga Mosque",
+          "Axim",
+          "Kayayei",
+          "Angwa Mo",
+          "Medikal",
+          "Shai Hills",
+          "Nsawam",
+          "Apuskeleke",
+          "Koko",
+          "Sister Derby",
+          "Boti Falls",
+          "Nkawkaw",
+          "Sparrow",
+          "Wagashi",
+          "Strongman",
+          "Kintampo Falls",
+          "Wenchi",
+          "Tonga",
+          "Banku and Okro",
+          "Amakye Dede",
+          "Adomi Bridge",
+          "Akosombo",
+          "Belly Dance",
+          "Fried Rice",
+          "Daddy Lumba",
+          "Oxford Street",
+          "Spintex",
+          "East Legon",
+          "Plantain chips",
+          "Kojo Antwi",
+          "Circle",
+          "Dansoman",
+          "Madina",
+          "Roasted Plantain",
+          "Obrafour",
+          "Teshie",
+          "Nungua",
+          "Tema",
+          "Suya",
+          "Samini",
+          "Ashaiman",
+          "Kasoa",
+          "Weija",
+          "Chinchinga",
+          "R2Bees",
+          "Lapaz",
+          "Achimota",
+          "Dome",
+          "Kulikuli",
+          "Becca",
+          "Legon",
+          "UPSA",
+          "Ashesi",
+          "Agbelima",
+          "Kwesi Arthur",
+          "Ridge",
+          "Cantonments",
+          "Airport Residential",
+          "Kokonte",
+          "Joe Mettle",
+          "Circle",
+          "Mallam",
+          "Gbawe",
+          "Tigernut",
+          "Diana Hamilton",
+          "Korle Bu",
+          "Kaneshie",
+          "Adabraka",
+          "Elon Musk",
+          "Star Wars",
+          "Mount Everest",
+          "Pasta",
+          "TikTok",
+          "Harry Potter",
+          "Amazon River",
+          "The Beatles",
+          "Basketball",
+          "Pyramids",
+          "Mona Lisa",
+          "Coca-Cola",
+          "The Simpsons",
+          "Volcano",
+          "Spiderman",
+          "London Eye",
+          "Albert Einstein",
+          "Netflix",
+          "Ping Pong",
+          "Croissant",
+          "YouTube",
+          "Grand Canyon",
+          "Beyoncé",
+          "Burrito",
+          "Inception",
+          "The Godfather",
+          "Bitcoin",
+          "Taylor Swift",
+          "Eiffel Tower",
+          "Mars",
+          "Usain Bolt",
+          "Nike",
+          "Steve Jobs",
+          "Super Mario",
+          "Las Vegas",
+          "Facebook",
+          "Taj Mahal",
+          "Titanic",
+          "Tennis",
+          "Dwayne Johnson",
+          "Instagram",
+          "Big Ben",
+          "Adele",
+          "Hamburger",
+          "Avatar",
+          "WhatsApp",
+          "Colosseum",
+          "Bill Gates",
+          "Golf",
+          "Jaws",
+          "Twitter",
+          "Leaning Tower",
+          "Ronaldo",
+          "Skating",
+          "Starbucks",
+          "Disney World",
+          "Berlin Wall",
+          "Messi",
+          "Rugby",
+          "Toy Story",
+          "Hollywood",
+          "Stonehenge",
+          "Zuckerberg",
+          "Surfing",
+          "Lion King",
+          "Golden Gate",
+          "Mount Rushmore",
+          "David Beckham",
+          "Boxing",
+          "Frozen",
+          "Barbie",
+          "Oppenheimer",
+          "Dua Lipa",
+          "Chess",
+          "Sushi",
+        ],
+        TABOO: [
+          {
+            word: "Jollof",
+            forbidden: ["Rice", "Tomato", "Pepper", "Food", "Ghana"],
+          },
+          {
+            word: "Tro-tro",
+            forbidden: ["Bus", "Mate", "Passenger", "Accra", "Transport"],
+          },
+          {
+            word: "Wedding",
+            forbidden: ["Bride", "Groom", "Ring", "Marriage", "Reception"],
+          },
+          {
+            word: "Wi-Fi",
+            forbidden: ["Internet", "Password", "Router", "Signal", "Network"],
+          },
+          {
+            word: "Alarm",
+            forbidden: ["Wake", "Morning", "Clock", "Late", "Snooze"],
+          },
+          {
+            word: "Traffic",
+            forbidden: ["Jam", "Cars", "Road", "Late", "Accra"],
+          },
+          {
+            word: "Church",
+            forbidden: ["Pastor", "Prayer", "Sermon", "Offering", "Service"],
+          },
+          {
+            word: "Birthday",
+            forbidden: ["Cake", "Party", "Gifts", "Age", "Celebrate"],
+          },
+          {
+            word: "Netflix",
+            forbidden: ["Movie", "Series", "Stream", "Watch", "TV"],
+          },
+          {
+            word: "WhatsApp",
+            forbidden: ["Message", "Chat", "Text", "Group", "Phone"],
+          },
+          {
+            word: "Instagram",
+            forbidden: ["Photos", "Posts", "Stories", "Followers", "Likes"],
+          },
+          {
+            word: "Twitter",
+            forbidden: ["Tweets", "X", "Trends", "Timeline", "Hashtag"],
+          },
+          {
+            word: "TikTok",
+            forbidden: ["Video", "Dance", "Viral", "Trends", "Sound"],
+          },
+          {
+            word: "Snapchat",
+            forbidden: ["Snaps", "Streaks", "Filter", "Camera", "Chat"],
+          },
+          {
+            word: "Barber",
+            forbidden: ["Hair", "Cut", "Salon", "Clippers", "Style"],
+          },
+          {
+            word: "Hairdresser",
+            forbidden: ["Braids", "Salon", "Hair", "Style", "Wig"],
+          },
+          {
+            word: "Market",
+            forbidden: ["Buy", "Sell", "Bargain", "Traders", "Goods"],
+          },
+          {
+            word: "Supermarket",
+            forbidden: ["Shopping", "Cart", "Aisle", "Groceries", "Store"],
+          },
+          {
+            word: "Mall",
+            forbidden: ["Shops", "Stores", "Cinema", "Food", "Parking"],
+          },
+          {
+            word: "Gym",
+            forbidden: ["Workout", "Exercise", "Weights", "Fitness", "Sweat"],
+          },
+          {
+            word: "Football",
+            forbidden: ["Ball", "Goal", "Match", "Team", "Referee"],
+          },
+          {
+            word: "Referee",
+            forbidden: ["Whistle", "Match", "Foul", "Cards", "Rules"],
+          },
+          {
+            word: "World Cup",
+            forbidden: ["Football", "Teams", "Tournament", "FIFA", "Goals"],
+          },
+          {
+            word: "Black Stars",
+            forbidden: ["Ghana", "Football", "Team", "Players", "Match"],
+          },
+          {
+            word: "Exam",
+            forbidden: ["Test", "School", "Questions", "Grade", "Study"],
+          },
+          {
+            word: "Homework",
+            forbidden: ["School", "Assignment", "Teacher", "Class", "Study"],
+          },
+          {
+            word: "Graduation",
+            forbidden: ["Degree", "School", "University", "Cap", "Gown"],
+          },
+          {
+            word: "Lecture",
+            forbidden: ["Class", "Teacher", "Notes", "Talk", "Hall"],
+          },
+          {
+            word: "Library",
+            forbidden: ["Books", "Quiet", "Study", "Read", "Shelves"],
+          },
+          {
+            word: "Boss",
+            forbidden: ["Work", "Office", "Manager", "Job", "Company"],
+          },
+          {
+            word: "Office",
+            forbidden: ["Work", "Desk", "Computer", "Job", "Meeting"],
+          },
+          {
+            word: "Meeting",
+            forbidden: ["Office", "Talk", "Agenda", "Discuss", "Room"],
+          },
+          {
+            word: "Deadline",
+            forbidden: ["Time", "Late", "Work", "Due", "Finish"],
+          },
+          {
+            word: "Salary",
+            forbidden: ["Money", "Pay", "Job", "Month", "Income"],
+          },
+          {
+            word: "Rain",
+            forbidden: ["Weather", "Water", "Wet", "Umbrella", "Clouds"],
+          },
+          { word: "Sun", forbidden: ["Hot", "Day", "Heat", "Sky", "Light"] },
+          {
+            word: "Generator",
+            forbidden: ["Light", "Power", "Fuel", "Noise", "Electricity"],
+          },
+          {
+            word: "Power cut",
+            forbidden: ["ECG", "Light", "Off", "Electricity", "Dark"],
+          },
+          {
+            word: "Fan",
+            forbidden: ["Heat", "Air", "Electric", "Cool", "Room"],
+          },
+          {
+            word: "Airport",
+            forbidden: ["Flight", "Plane", "Travel", "Luggage", "Terminal"],
+          },
+          {
+            word: "Passport",
+            forbidden: ["Visa", "Travel", "ID", "Airport", "Immigration"],
+          },
+          {
+            word: "Suitcase",
+            forbidden: ["Bag", "Travel", "Clothes", "Luggage", "Trip"],
+          },
+          {
+            word: "Boarding",
+            forbidden: ["Flight", "Plane", "Gate", "Airport", "Pass"],
+          },
+          {
+            word: "Holiday",
+            forbidden: ["Vacation", "Travel", "Trip", "Relax", "Leave"],
+          },
+          {
+            word: "Taxi",
+            forbidden: ["Car", "Ride", "Driver", "Transport", "Fare"],
+          },
+          { word: "Uber", forbidden: ["Ride", "App", "Driver", "Taxi", "Car"] },
+          {
+            word: "Traffic light",
+            forbidden: ["Red", "Green", "Yellow", "Road", "Stop"],
+          },
+          {
+            word: "Road trip",
+            forbidden: ["Drive", "Travel", "Car", "Journey", "Long"],
+          },
+          {
+            word: "Fuel",
+            forbidden: ["Petrol", "Gas", "Car", "Station", "Tank"],
+          },
+          {
+            word: "Phone call",
+            forbidden: ["Ring", "Talk", "Answer", "Voice", "Number"],
+          },
+          {
+            word: "Missed call",
+            forbidden: ["Phone", "Ring", "Answer", "Late", "Call"],
+          },
+          {
+            word: "Screenshot",
+            forbidden: ["Phone", "Picture", "Screen", "Capture", "Save"],
+          },
+          {
+            word: "Voice note",
+            forbidden: ["Audio", "Message", "WhatsApp", "Talk", "Send"],
+          },
+          {
+            word: "Group admin",
+            forbidden: ["WhatsApp", "Remove", "Add", "Rules", "Group"],
+          },
+          {
+            word: "Laptop",
+            forbidden: ["Computer", "Keyboard", "Screen", "Work", "Device"],
+          },
+          {
+            word: "Keyboard",
+            forbidden: ["Type", "Keys", "Computer", "Letters", "Input"],
+          },
+          {
+            word: "Mouse",
+            forbidden: ["Click", "Computer", "Cursor", "Scroll", "Device"],
+          },
+          {
+            word: "Printer",
+            forbidden: ["Paper", "Print", "Ink", "Document", "Office"],
+          },
+          {
+            word: "Projector",
+            forbidden: ["Screen", "Display", "Presentation", "Slide", "Light"],
+          },
+          {
+            word: "Photographer",
+            forbidden: ["Camera", "Pictures", "Photos", "Shoot", "Lens"],
+          },
+          {
+            word: "Selfie",
+            forbidden: ["Photo", "Camera", "Phone", "Picture", "Pose"],
+          },
+          {
+            word: "Video call",
+            forbidden: ["Zoom", "Camera", "Talk", "Online", "Call"],
+          },
+          {
+            word: "Livestream",
+            forbidden: ["Live", "Video", "Online", "Broadcast", "Watch"],
+          },
+          {
+            word: "Content creator",
+            forbidden: ["Videos", "Online", "Post", "Followers", "Social"],
+          },
+          {
+            word: "Restaurant",
+            forbidden: ["Food", "Menu", "Eat", "Table", "Order"],
+          },
+          {
+            word: "Waiter",
+            forbidden: ["Serve", "Food", "Restaurant", "Order", "Table"],
+          },
+          {
+            word: "Bill",
+            forbidden: ["Pay", "Money", "Receipt", "Food", "Cost"],
+          },
+          {
+            word: "Takeaway",
+            forbidden: ["Food", "Pack", "Order", "Eat", "Restaurant"],
+          },
+          {
+            word: "Fast food",
+            forbidden: ["Quick", "Eat", "Burger", "Fries", "Restaurant"],
+          },
+          {
+            word: "Shopping list",
+            forbidden: ["Buy", "Items", "Groceries", "Market", "Plan"],
+          },
+          {
+            word: "Discount",
+            forbidden: ["Sale", "Cheap", "Price", "Off", "Deal"],
+          },
+          {
+            word: "Receipt",
+            forbidden: ["Paper", "Proof", "Payment", "Buy", "Store"],
+          },
+          {
+            word: "Cashier",
+            forbidden: ["Pay", "Money", "Till", "Shop", "Counter"],
+          },
+          {
+            word: "Queue",
+            forbidden: ["Line", "Wait", "People", "Turn", "Stand"],
+          },
+          {
+            word: "Neighbours",
+            forbidden: ["Next door", "People", "House", "Noise", "Nearby"],
+          },
+          {
+            word: "Landlord",
+            forbidden: ["Rent", "House", "Owner", "Room", "Payment"],
+          },
+          {
+            word: "Rent",
+            forbidden: ["Pay", "House", "Monthly", "Landlord", "Room"],
+          },
+          {
+            word: "Moving out",
+            forbidden: ["House", "Pack", "Leave", "Shift", "Change"],
+          },
+          {
+            word: "Housewarming",
+            forbidden: ["Party", "New", "House", "Invite", "Celebrate"],
+          },
+          {
+            word: "Laundry",
+            forbidden: ["Wash", "Clothes", "Dry", "Soap", "Machine"],
+          },
+          {
+            word: "Ironing",
+            forbidden: ["Clothes", "Heat", "Press", "Wrinkles", "Shirt"],
+          },
+          {
+            word: "Dirty dishes",
+            forbidden: ["Plates", "Wash", "Sink", "Kitchen", "Food"],
+          },
+          {
+            word: "Cleaning day",
+            forbidden: ["House", "Wash", "Sweep", "Mop", "Chores"],
+          },
+          {
+            word: "Garbage",
+            forbidden: ["Trash", "Waste", "Bin", "Throw", "Smell"],
+          },
+          {
+            word: "Breakfast",
+            forbidden: ["Morning", "Food", "Eat", "Tea", "Coffee"],
+          },
+          {
+            word: "Lunch",
+            forbidden: ["Afternoon", "Food", "Eat", "Meal", "Noon"],
+          },
+          {
+            word: "Dinner",
+            forbidden: ["Night", "Food", "Eat", "Supper", "Evening"],
+          },
+          {
+            word: "Midnight snack",
+            forbidden: ["Night", "Eat", "Food", "Late", "Hungry"],
+          },
+          {
+            word: "Cooking",
+            forbidden: ["Food", "Kitchen", "Prepare", "Heat", "Pot"],
+          },
+          {
+            word: "Spices",
+            forbidden: ["Pepper", "Salt", "Seasoning", "Taste", "Food"],
+          },
+          {
+            word: "Blender",
+            forbidden: ["Grind", "Kitchen", "Machine", "Food", "Electric"],
+          },
+          {
+            word: "Gas stove",
+            forbidden: ["Cook", "Fire", "Kitchen", "Heat", "Burner"],
+          },
+          {
+            word: "Microwave",
+            forbidden: ["Heat", "Food", "Quick", "Kitchen", "Warm"],
+          },
+          {
+            word: "Leftovers",
+            forbidden: ["Food", "Yesterday", "Eat", "Fridge", "Remain"],
+          },
+          {
+            word: "Sleep",
+            forbidden: ["Bed", "Night", "Rest", "Dream", "Tired"],
+          },
+          {
+            word: "Nap",
+            forbidden: ["Sleep", "Short", "Rest", "Day", "Tired"],
+          },
+          {
+            word: "Insomnia",
+            forbidden: ["Sleep", "Night", "Awake", "Tired", "Bed"],
+          },
+          {
+            word: "Dream",
+            forbidden: ["Sleep", "Night", "Mind", "Vision", "Rest"],
+          },
+          {
+            word: "Alarm clock",
+            forbidden: ["Wake", "Morning", "Time", "Ring", "Late"],
+          },
+          {
+            word: "Workout",
+            forbidden: ["Exercise", "Gym", "Sweat", "Fitness", "Train"],
+          },
+          {
+            word: "Stretching",
+            forbidden: ["Warm up", "Muscles", "Exercise", "Body", "Flex"],
+          },
+          {
+            word: "Yoga",
+            forbidden: ["Stretch", "Calm", "Pose", "Exercise", "Balance"],
+          },
+          {
+            word: "Jogging",
+            forbidden: ["Run", "Exercise", "Morning", "Fitness", "Road"],
+          },
+          {
+            word: "Personal trainer",
+            forbidden: ["Gym", "Coach", "Workout", "Exercise", "Guide"],
+          },
+          {
+            word: "Doctor",
+            forbidden: ["Hospital", "Patient", "Medicine", "Treat", "Health"],
+          },
+          {
+            word: "Nurse",
+            forbidden: ["Hospital", "Care", "Doctor", "Patient", "Medicine"],
+          },
+          {
+            word: "Pharmacy",
+            forbidden: ["Drugs", "Medicine", "Buy", "Chemist", "Store"],
+          },
+          {
+            word: "Prescription",
+            forbidden: ["Doctor", "Medicine", "Paper", "Drugs", "Dose"],
+          },
+          {
+            word: "Injection",
+            forbidden: ["Needle", "Medicine", "Shot", "Hospital", "Pain"],
+          },
+          {
+            word: "Police",
+            forbidden: ["Law", "Officer", "Arrest", "Crime", "Station"],
+          },
+          {
+            word: "Court",
+            forbidden: ["Judge", "Law", "Case", "Trial", "Justice"],
+          },
+          {
+            word: "Judge",
+            forbidden: ["Court", "Law", "Decision", "Gavel", "Case"],
+          },
+          {
+            word: "Fine",
+            forbidden: ["Money", "Punishment", "Pay", "Police", "Offence"],
+          },
+          {
+            word: "Jail",
+            forbidden: ["Prison", "Cell", "Crime", "Locked", "Punishment"],
+          },
+          {
+            word: "Wedding anniversary",
+            forbidden: ["Marriage", "Year", "Celebrate", "Couple", "Ring"],
+          },
+          {
+            word: "Engagement",
+            forbidden: ["Ring", "Proposal", "Marriage", "Couple", "Promise"],
+          },
+          {
+            word: "Breakup",
+            forbidden: ["End", "Relationship", "Split", "Couple", "Heart"],
+          },
+          {
+            word: "Crush",
+            forbidden: ["Like", "Feelings", "Person", "Secret", "Love"],
+          },
+          {
+            word: "Blind date",
+            forbidden: ["Meet", "First", "Stranger", "Romantic", "Unknown"],
+          },
+          {
+            word: "Surprise party",
+            forbidden: ["Secret", "Celebrate", "Birthday", "Hidden", "Guests"],
+          },
+          {
+            word: "House party",
+            forbidden: ["Music", "Friends", "Home", "Dance", "Noise"],
+          },
+          {
+            word: "Game night",
+            forbidden: ["Games", "Friends", "Play", "Fun", "Competition"],
+          },
+          {
+            word: "After party",
+            forbidden: ["Late", "Continue", "Music", "Night", "Fun"],
+          },
+          {
+            word: "Cleanup",
+            forbidden: ["Mess", "Clean", "After", "Party", "Chores"],
+          },
+          {
+            word: "Public holiday",
+            forbidden: ["Day off", "Work", "Rest", "Celebrate", "Nation"],
+          },
+          {
+            word: "Weekend",
+            forbidden: ["Saturday", "Sunday", "Rest", "Free", "Break"],
+          },
+          {
+            word: "Vacation leave",
+            forbidden: ["Holiday", "Work", "Time off", "Travel", "Rest"],
+          },
+          {
+            word: "Resignation",
+            forbidden: ["Quit", "Job", "Work", "Leave", "Office"],
+          },
+          {
+            word: "Promotion",
+            forbidden: ["Job", "Raise", "Work", "Position", "Upgrade"],
+          },
+          {
+            word: "Motivation",
+            forbidden: ["Drive", "Push", "Inspire", "Energy", "Goal"],
+          },
+          {
+            word: "Procrastination",
+            forbidden: ["Delay", "Later", "Avoid", "Postpone", "Lazy"],
+          },
+          {
+            word: "Overthinking",
+            forbidden: ["Mind", "Worry", "Think", "Stress", "Thoughts"],
+          },
+          {
+            word: "Confidence",
+            forbidden: ["Believe", "Self", "Strong", "Proud", "Sure"],
+          },
+          {
+            word: "Burnout",
+            forbidden: ["Tired", "Work", "Stress", "Exhausted", "Overload"],
+          },
+          {
+            word: "Dentist",
+            forbidden: ["Teeth", "Doctor", "Pain", "Clinic", "Mouth"],
+          },
+          {
+            word: "Toothbrush",
+            forbidden: ["Teeth", "Brush", "Paste", "Mouth", "Clean"],
+          },
+          {
+            word: "Shower",
+            forbidden: ["Bath", "Water", "Soap", "Clean", "Bathroom"],
+          },
+          {
+            word: "Toilet",
+            forbidden: ["Bathroom", "Flush", "Restroom", "Seat", "Pee"],
+          },
+          {
+            word: "Mirror",
+            forbidden: ["Reflection", "Look", "Glass", "Face", "See"],
+          },
+          {
+            word: "Clothes shopping",
+            forbidden: ["Buy", "Wear", "Store", "Fashion", "Outfit"],
+          },
+          {
+            word: "Laundry basket",
+            forbidden: ["Clothes", "Wash", "Dirty", "Carry", "Basket"],
+          },
+          {
+            word: "Wardrobe",
+            forbidden: ["Clothes", "Closet", "Hang", "Dress", "Outfits"],
+          },
+          {
+            word: "Iron board",
+            forbidden: ["Clothes", "Press", "Iron", "Wrinkles", "Stand"],
+          },
+          {
+            word: "Sneakers",
+            forbidden: ["Shoes", "Wear", "Feet", "Trainers", "Walk"],
+          },
+          {
+            word: "Rainy season",
+            forbidden: ["Weather", "Rain", "Wet", "Umbrella", "Clouds"],
+          },
+          {
+            word: "Heat wave",
+            forbidden: ["Hot", "Weather", "Sun", "Sweat", "Temperature"],
+          },
+          {
+            word: "Harmattan",
+            forbidden: ["Dust", "Cold", "Season", "Dry", "Wind"],
+          },
+          {
+            word: "Flooding",
+            forbidden: ["Water", "Rain", "Overflow", "Damage", "Road"],
+          },
+          {
+            word: "Weather forecast",
+            forbidden: ["Prediction", "Rain", "Sun", "News", "Today"],
+          },
+          {
+            word: "Barbecue",
+            forbidden: ["Grill", "Meat", "Fire", "Smoke", "Food"],
+          },
+          {
+            word: "Picnic",
+            forbidden: ["Outdoor", "Food", "Park", "Blanket", "Eat"],
+          },
+          {
+            word: "Roadside food",
+            forbidden: ["Street", "Eat", "Vendor", "Quick", "Outside"],
+          },
+          {
+            word: "Home cooking",
+            forbidden: ["Food", "Kitchen", "Prepare", "House", "Meal"],
+          },
+          {
+            word: "Potluck",
+            forbidden: ["Food", "Bring", "Share", "Party", "Dishes"],
+          },
+          {
+            word: "Road accident",
+            forbidden: ["Crash", "Car", "Injury", "Police", "Road"],
+          },
+          {
+            word: "Speeding",
+            forbidden: ["Fast", "Car", "Road", "Limit", "Drive"],
+          },
+          {
+            word: "Driving test",
+            forbidden: ["License", "Car", "Road", "Exam", "Pass"],
+          },
+          {
+            word: "Traffic officer",
+            forbidden: ["Police", "Road", "Stop", "Car", "Law"],
+          },
+          {
+            word: "Car breakdown",
+            forbidden: ["Engine", "Stop", "Repair", "Road", "Problem"],
+          },
+          {
+            word: "First day at work",
+            forbidden: ["Job", "Office", "New", "Nervous", "Start"],
+          },
+          {
+            word: "Internship",
+            forbidden: ["Work", "Student", "Office", "Experience", "Learn"],
+          },
+          {
+            word: "Side hustle",
+            forbidden: ["Extra", "Money", "Work", "Business", "Income"],
+          },
+          {
+            word: "Remote work",
+            forbidden: ["Home", "Online", "Job", "Computer", "Zoom"],
+          },
+          {
+            word: "Work-life balance",
+            forbidden: ["Time", "Stress", "Job", "Rest", "Life"],
+          },
+          {
+            word: "Lost item",
+            forbidden: ["Missing", "Find", "Search", "Gone", "Belonging"],
+          },
+          {
+            word: "Found it!",
+            forbidden: ["Locate", "See", "Discover", "Finally", "Here"],
+          },
+          {
+            word: "Borrowing",
+            forbidden: ["Lend", "Take", "Return", "Use", "Item"],
+          },
+          {
+            word: "Returning",
+            forbidden: ["Give back", "Borrowed", "Item", "Back", "Owner"],
+          },
+          {
+            word: "Broken item",
+            forbidden: ["Damage", "Fix", "Repair", "Crack", "Spoilt"],
+          },
+          {
+            word: "Emergency",
+            forbidden: ["Urgent", "Help", "Quick", "Danger", "Call"],
+          },
+          {
+            word: "Fire drill",
+            forbidden: ["Practice", "Alarm", "Exit", "Safety", "Building"],
+          },
+          {
+            word: "Power surge",
+            forbidden: ["Electric", "Damage", "Light", "Voltage", "Shock"],
+          },
+          {
+            word: "Internet outage",
+            forbidden: ["Wi‑Fi", "Down", "No signal", "Online", "Lost"],
+          },
+          {
+            word: "System update",
+            forbidden: ["Phone", "Software", "Restart", "Install", "Wait"],
+          },
+          {
+            word: "First impression",
+            forbidden: ["Meeting", "Opinion", "Early", "Think", "Judge"],
+          },
+          {
+            word: "Small talk",
+            forbidden: ["Chat", "Talk", "Weather", "Awkward", "Conversation"],
+          },
+          {
+            word: "Public speaking",
+            forbidden: ["Talk", "Audience", "Speech", "Stage", "Nervous"],
+          },
+          {
+            word: "Presentation",
+            forbidden: ["Slides", "Talk", "Meeting", "Explain", "Show"],
+          },
+          {
+            word: "Ice breaker",
+            forbidden: ["Game", "Start", "People", "Talk", "Warm up"],
+          },
+          {
+            word: "Late arrival",
+            forbidden: ["Delay", "Time", "Sorry", "Wait", "Traffic"],
+          },
+          {
+            word: "Early bird",
+            forbidden: ["Morning", "First", "Early", "Wake", "Time"],
+          },
+          {
+            word: "Last minute",
+            forbidden: ["Rush", "Late", "Quick", "Time", "Hurry"],
+          },
+          {
+            word: "Cancelled plans",
+            forbidden: ["Change", "No show", "Postpone", "Later", "Busy"],
+          },
+          {
+            word: "Rescheduling",
+            forbidden: ["Change", "Time", "Later", "Move", "Plan"],
+          },
+          {
+            word: "Unexpected guest",
+            forbidden: ["Visit", "Surprise", "Arrive", "No notice", "Door"],
+          },
+          {
+            word: "Sleepover",
+            forbidden: ["Night", "Stay", "Friends", "House", "Bed"],
+          },
+          {
+            word: "Roommate",
+            forbidden: ["Share", "House", "Room", "Live", "Together"],
+          },
+          {
+            word: "House rules",
+            forbidden: ["Rules", "Home", "Follow", "Stay", "Agreement"],
+          },
+          {
+            word: "Quiet hours",
+            forbidden: ["Noise", "Night", "Sleep", "Rules", "Time"],
+          },
+          {
+            word: "Throwback",
+            forbidden: ["Old", "Memory", "Past", "Photo", "Time"],
+          },
+          {
+            word: "Glow up",
+            forbidden: ["Change", "Improve", "Before", "After", "Look"],
+          },
+          {
+            word: "Main character",
+            forbidden: ["Attention", "Star", "Story", "Hero", "Focus"],
+          },
+          {
+            word: "Inside joke",
+            forbidden: ["Secret", "Funny", "Group", "Laugh", "Meaning"],
+          },
+          {
+            word: "Second-hand embarrassment",
+            forbidden: ["Cringe", "Awkward", "Feel", "Watch", "Uncomfortable"],
+          },
+          {
+            word: "Motivational quote",
+            forbidden: ["Words", "Inspire", "Post", "Meaning", "Life"],
+          },
+          {
+            word: "Daily routine",
+            forbidden: ["Everyday", "Habit", "Schedule", "Morning", "Night"],
+          },
+          {
+            word: "Comfort zone",
+            forbidden: ["Safe", "Familiar", "Fear", "Stay", "Easy"],
+          },
+          {
+            word: "Risk taking",
+            forbidden: ["Chance", "Dare", "Try", "Fear", "Bold"],
+          },
+          {
+            word: "Personal growth",
+            forbidden: ["Improve", "Learn", "Change", "Self", "Progress"],
+          },
+          {
+            word: "Deadline pressure",
+            forbidden: ["Time", "Stress", "Work", "Due", "Rush"],
+          },
+          {
+            word: "Burning out",
+            forbidden: ["Tired", "Overwork", "Stress", "Exhausted", "Done"],
+          },
+          {
+            word: "Mental break",
+            forbidden: ["Rest", "Pause", "Reset", "Relax", "Mind"],
+          },
+          {
+            word: "Weekend reset",
+            forbidden: ["Rest", "Clean", "Prepare", "New week", "Refresh"],
+          },
+          {
+            word: "Sunday anxiety",
+            forbidden: ["Work", "Monday", "Stress", "Tomorrow", "Thoughts"],
+          },
+          {
+            word: "Winning streak",
+            forbidden: ["Consecutive", "Wins", "Game", "Success", "Keep going"],
+          },
+          {
+            word: "Comeback",
+            forbidden: ["Return", "Recover", "Again", "Bounce back", "Win"],
+          },
+          {
+            word: "Underdog",
+            forbidden: ["Unexpected", "Win", "Small", "Surprise", "Beat"],
+          },
+          {
+            word: "Friendly rivalry",
+            forbidden: ["Competition", "Fun", "Teams", "Jokes", "Opponents"],
+          },
+          {
+            word: "Game changer",
+            forbidden: ["Big", "Impact", "Change", "Important", "Moment"],
+          },
+          {
+            word: "Popsicle",
+            forbidden: ["Ice", "Cold", "Stick", "Fruit", "Summer"],
+          },
+          {
+            word: "Backpack",
+            forbidden: ["Bag", "School", "Carry", "Straps", "Books"],
+          },
+          {
+            word: "Telescope",
+            forbidden: ["Stars", "Space", "Look", "Planet", "Sky"],
+          },
+          {
+            word: "Marshmallow",
+            forbidden: ["White", "Fire", "Camp", "Soft", "Sugar"],
+          },
+          {
+            word: "Pillow",
+            forbidden: ["Bed", "Sleep", "Head", "Soft", "Case"],
+          },
+          {
+            word: "Suitcase",
+            forbidden: ["Travel", "Bag", "Airport", "Clothes", "Holiday"],
+          },
+          {
+            word: "Guitar",
+            forbidden: ["Music", "Strings", "Play", "Instrument", "Rock"],
+          },
+          {
+            word: "Subway",
+            forbidden: ["Train", "Tunnel", "Underground", "Ticket", "Commute"],
+          },
+          {
+            word: "Popcorn",
+            forbidden: ["Movie", "Cinema", "Butter", "Corn", "Snack"],
+          },
+          {
+            word: "Compass",
+            forbidden: ["North", "Direction", "Map", "Navigate", "Needle"],
+          },
+          {
+            word: "Scissors",
+            forbidden: ["Cut", "Paper", "Sharp", "Tool", "Metal"],
+          },
+          {
+            word: "Elevator",
+            forbidden: ["Lift", "Floor", "Building", "Up", "Down"],
+          },
+          {
+            word: "Mirror",
+            forbidden: ["Reflection", "Look", "Glass", "Self", "Wall"],
+          },
+        ],
+        MOST_LIKELY: [
+          "Who is most likely to win the lottery but lose the ticket?",
+          "Who is most likely to become a billionaire?",
+          "Who is most likely to go to the wrong house while drunk?",
+          "Who is most likely to survive a zombie apocalypse?",
+          "Who is most likely to win an argument with a security guard?",
+          "Who is most likely to marry a celebrity for money?",
+          "Who is most likely to become a famous TikToker?",
+          "Who is most likely to forget their kid's name?",
+          "Who is most likely to travel to space and never come back?",
+          "Who is most likely to be a secret agent?",
+          "Who is most likely to win a Nobel Prize for something useless?",
+          "Who is most likely to cry in a commercial?",
+          "Who is most likely to move to a farm and raise goats?",
+          "Who is most likely to get a tattoo of a meme?",
+          "Who is most likely to win a reality TV show?",
+          "Who is most likely to accidentally join a cult?",
+          "Who is most likely to own 10 cats?",
+          "Who is most likely to fall asleep in a cinema?",
+          "Who is most likely to win an eating competition?",
+          "Who is most likely to be late to their own wedding?",
+          "Who is most likely to get a tattoo they regret?",
+          "Who is most likely to become the President?",
+          "Who is most likely to win an Oscar?",
+          "Who is most likely to own a private island?",
+          "Who is most likely to become a superhero?",
+          "Who is most likely to survive on a deserted island?",
+          "Who is most likely to become a chef?",
+          "Who is most likely to go bungee jumping?",
+        ],
+        CHARADES: [
+          "Eating a hot pepper",
+          "A cat chasing a laser pointer",
+          "A toddler having a tantrum in a mall",
+          "Opening a bottle of champagne",
+          "Trying to walk on ice",
+          "Slipping on a banana peel",
+          "A robot trying to dance",
+          "Mowing the lawn with a tiny mower",
+          "Getting stuck in an elevator",
+          "Winning a gold medal in swimming",
+          "A mime stuck in a box",
+          "A dinosaur trying to clap its hands",
+          "A superhero losing their powers",
+          "Walking through a very thick swamp",
+          "Being a very aggressive waiter",
+          "A penguin trying to fly",
+          "Trying to light a fire with two sticks",
+          "A person stuck in a giant spiderweb",
+          "Doing yoga on a surfboard",
+          "A professional conductor leading an orchestra",
+          "Ironing a shirt with no iron",
+          "Putting on makeup in a moving car",
+          "A spider crawling up your back",
+          "Fishing and catching a boot",
+          "A dog chasing its own tail",
+          "Surfing a massive wave",
+          "Taking a selfie with a celebrity",
+          "Painting a masterpiece",
+          "Changing a flat tire in the rain",
+          "Watching a very scary movie",
+          "Winning the lottery",
+        ],
+        TRUTH_LIE: [
+          "Tell 2 Truths and 1 Lie. The group must guess which is the lie.",
+          "Share a 'Fact' about your childhood that sounds fake. Is it true?",
+          "I once met a celebrity in a bathroom. Is it true?",
+          "I have a secret collection of something weird. Is it true?",
+          "I can speak a language nobody knows about. Is it true?",
+          "I once ate something so gross I threw up immediately. Is it true?",
+          "I have been on TV before. Is it true?",
+          "I can hold my breath for over two minutes. Is it true?",
+          "I once traveled to a country without a plan. Is it true?",
+          "I have a middle name I absolutely hate. Is it true?",
+          "I once broke a bone doing something very stupid. Is it true?",
+          "I can sleep for 14 hours straight. Is it true?",
+          "I have a phobia of something very common. Is it true?",
+        ],
+      };
+
+      // --- State ---
+      const App = () => {
+        const [appMode, setAppMode] = useState("landing"); // landing, lobby, game
+        const [role, setRole] = useState(null); // gm, player
+
+        // Networking State
+        const [peer, setPeer] = useState(null);
+        const [roomKey, setRoomKey] = useState(null); // Own ID if GM, Target ID if Player
+        const [connections, setConnections] = useState([]); // List of DataConnections (GM only)
+        const [myConn, setMyConn] = useState(null); // Connection to GM (Player only)
+        const [players, setPlayers] = useState([]); // Array of { id, name }
+
+        const [activeGame, setActiveGame] = useState(null);
+        const [currentCard, setCurrentCard] = useState(null);
+        const [gameState, setGameState] = useState({
+          team1Score: 0,
+          team2Score: 0,
+          currentTeam: 1,
+          currentPlayerIndex: 1,
+          teamSize: 2,
+          round: 1,
+          turnScore: 0,
+          phase: "setup",
+          dieRoll: 0,
+          hasRolled: false,
+          gameGoal: 30,
+          maxRounds: 5,
+          winner: null,
+        });
+        const [timeLeft, setTimeLeft] = useState(0);
+        const [isActive, setIsActive] = useState(false);
+        const [isRolling, setIsRolling] = useState(false);
+
+        // Other refs/state
+        const [usedIndices, setUsedIndices] = useState({
+          THIRTY_SECONDS: [],
+          TABOO: [],
+          MOST_LIKELY: [],
+          CHARADES: [],
+          TRUTH_LIE: [],
+        });
+        const timerRef = useRef(null);
+
+        // --- Effects for Networking ---
+
+        // Cleanup Peer on unmount
+        useEffect(() => {
+          return () => {
+            if (peer) peer.destroy();
+          };
+        }, [peer]);
+
+        const initializeGM = () => {
+          const newPeer = new Peer();
+          newPeer.on("open", (id) => {
+            setRoomKey(id);
+            setAppMode("lobby");
+          });
+          newPeer.on("connection", (conn) => {
+            conn.on("open", () => {
+              // Receive metadata (name)
+              const playerName = conn.metadata?.name || "Unknown";
+              const newPlayer = { id: conn.peer, name: playerName };
+
+              setPlayers((prev) => {
+                const updated = [...prev, newPlayer];
+                // Broadcast new player list to ALL connections
+                const payload = { type: "UPDATE_PLAYERS", players: updated };
+                [...connections, conn].forEach((c) => c.send(payload));
+                return updated;
+              });
+
+              setConnections((prev) => [...prev, conn]);
+            });
+
+            conn.on("data", (data) => {
+              // Handle data from players if needed (e.g. buzzer, answers)
+              console.log("GM Received:", data);
+            });
+
+            conn.on("close", () => {
+              // Remove player
+              setPlayers((prev) => {
+                const updated = prev.filter((p) => p.id !== conn.peer);
+                // Broadcast update
+                connections
+                  .filter((c) => c.peer !== conn.peer)
+                  .forEach((c) =>
+                    c.send({ type: "UPDATE_PLAYERS", players: updated })
+                  );
+                return updated;
+              });
+              setConnections((prev) =>
+                prev.filter((c) => c.peer !== conn.peer)
+              );
+            });
+          });
+          setPeer(newPeer);
+        };
+
+        const initializePlayer = (targetKey, name) => {
+          const newPeer = new Peer();
+          newPeer.on("open", () => {
+            const conn = newPeer.connect(targetKey, { metadata: { name } });
+            conn.on("open", () => {
+              setMyConn(conn);
+              setAppMode("lobby");
+              setRoomKey(targetKey);
+            });
+            conn.on("data", (data) => {
+              console.log("Player Received:", data);
+              if (data.type === "UPDATE_PLAYERS") {
+                setPlayers(data.players);
+              }
+              if (data.type === "START_GAME") {
+                setAppMode("game");
+                setGameState((prev) => ({ ...prev, phase: "setup" }));
+              }
+              // Handle other game state syncs here
+            });
+            conn.on("close", () => {
+              alert("Connection to Host lost");
+              window.location.reload();
+            });
+          });
+          newPeer.on("error", (err) => {
+            alert("Error connecting: " + err.type);
+            setAppMode("landing");
+          });
+          setPeer(newPeer);
+        };
+
+        const handleStartGame = () => {
+          // GM starts game
+          setAppMode("game");
+          // Broadcast start
+          connections.forEach((c) => c.send({ type: "START_GAME" }));
+        };
+
+        const handleExit = () => {
+          if (peer) peer.destroy();
+          setPeer(null);
+          setRoomKey(null);
+          setConnections([]);
+          setPlayers([]);
+          setAppMode("landing");
+        };
+
+        // --- Existing Game Logic (Timer, etc) ---
+        useEffect(() => {
+          if (isActive && timeLeft > 0) {
+            timerRef.current = setInterval(() => {
+              setTimeLeft((prev) => prev - 1);
+            }, 1000);
+          } else if (timeLeft === 0 && isActive) {
+            clearInterval(timerRef.current);
+            endTurn();
+          }
+          return () => clearInterval(timerRef.current);
+        }, [isActive, timeLeft]);
+
+        const selectGame = (gameKey) => {
+          setActiveGame(gameKey);
+          if (gameKey === "TABOO") {
+            setGameState((prev) => ({ ...prev, phase: "taboo_setup" }));
+          } else {
+            const isCompetitive = gameKey === "THIRTY_SECONDS";
+            setGameState((prev) => ({
+              ...prev,
+              phase: isCompetitive ? "ready" : "playing",
+              team1Score: 0,
+              team2Score: 0,
+              currentTeam: 1,
+              currentPlayerIndex: 1,
+              round: 1,
+              turnScore: 0,
+              dieRoll: 0,
+              hasRolled: false,
+              winner: null,
+            }));
+            generateNextCard(gameKey);
+          }
+        };
+
+        const startTaboo = (size) => {
+          setGameState((prev) => ({
+            ...prev,
+            teamSize: size,
+            phase: "ready",
+            team1Score: 0,
+            team2Score: 0,
+            currentTeam: 1,
+            currentPlayerIndex: 1,
+            round: 1,
+            turnScore: 0,
+            winner: null,
+          }));
+          generateNextCard("TABOO");
+        };
+
+        const generateNextCard = (gameKey) => {
+          const data = GAMES_DATA[gameKey];
+          const used = usedIndices[gameKey] || [];
+          let availableIndices = data
+            .map((_, i) => i)
+            .filter((i) => !used.includes(i));
+          if (availableIndices.length === 0) {
+            availableIndices = data.map((_, i) => i);
+            setUsedIndices((prev) => ({ ...prev, [gameKey]: [] }));
+          }
+          const randomIndex =
+            availableIndices[
+              Math.floor(Math.random() * availableIndices.length)
+            ];
+          setCurrentCard(data[randomIndex]);
+          setUsedIndices((prev) => ({
+            ...prev,
+            [gameKey]: [...(prev[gameKey] || []), randomIndex],
+          }));
+        };
+
+        const rollDice = () => {
+          setIsRolling(true);
+          setTimeout(() => {
+            const roll = Math.floor(Math.random() * 3);
+            setGameState((prev) => ({
+              ...prev,
+              dieRoll: roll,
+              hasRolled: true,
+            }));
+            setIsRolling(false);
+          }, 600);
+        };
+
+        const startTurn = () => {
+          setGameState((prev) => ({ ...prev, phase: "playing", turnScore: 0 }));
+          const time = activeGame === "THIRTY_SECONDS" ? 30 : 60;
+          setTimeLeft(time);
+          setIsActive(true);
+        };
+
+        const endTurn = () => {
+          setIsActive(false);
+          setGameState((prev) => ({ ...prev, phase: "summary" }));
+        };
+
+        const togglePause = () => {
+          setIsActive((prev) => !prev);
+        };
+
+        const handleCorrect = () => {
+          setGameState((prev) => ({ ...prev, turnScore: prev.turnScore + 1 }));
+          generateNextCard(activeGame);
+        };
+
+        const handlePass = () => {
+          generateNextCard(activeGame);
+        };
+
+        const nextTeam = () => {
+          setGameState((prev) => {
+            const isTeam1 = prev.currentTeam === 1;
+            let winner = null;
+            let newT1Score = prev.team1Score;
+            let newT2Score = prev.team2Score;
+            let nextTeamNum = prev.currentTeam;
+            let nextPlayerIndex = prev.currentPlayerIndex;
+            let nextRoundNum = prev.round;
+
+            if (activeGame === "THIRTY_SECONDS") {
+              const movement = Math.max(0, prev.turnScore - prev.dieRoll);
+              if (isTeam1) {
+                newT1Score += movement;
+                if (newT1Score >= prev.gameGoal) winner = "Team 1";
+              } else {
+                newT2Score += movement;
+                if (newT2Score >= prev.gameGoal) winner = "Team 2";
+              }
+              nextTeamNum = isTeam1 ? 2 : 1;
+              nextRoundNum = !isTeam1 ? prev.round + 1 : prev.round;
+            } else if (activeGame === "TABOO") {
+              if (isTeam1) newT1Score += prev.turnScore;
+              else newT2Score += prev.turnScore;
+
+              // Rotation Logic
+              if (isTeam1) {
+                // After Team 1 goes, same player number for Team 2 goes
+                nextTeamNum = 2;
+              } else {
+                // After Team 2 goes, check if we need to move to next player
+                if (prev.currentPlayerIndex < prev.teamSize) {
+                  nextTeamNum = 1;
+                  nextPlayerIndex = prev.currentPlayerIndex + 1;
+                } else {
+                  // Round is done
+                  nextTeamNum = 1;
+                  nextPlayerIndex = 1;
+                  nextRoundNum = prev.round + 1;
+
+                  // Check for end of game (using a max rounds limit or similar)
+                  if (nextRoundNum > prev.maxRounds) {
+                    if (newT1Score > newT2Score) winner = "Team 1";
+                    else if (newT2Score > newT1Score) winner = "Team 2";
+                    else winner = "Draw";
+                  }
+                }
+              }
+            }
+
+            return {
+              ...prev,
+              currentTeam: nextTeamNum,
+              currentPlayerIndex: nextPlayerIndex,
+              round: nextRoundNum,
+              phase: winner ? "winner" : "ready",
+              team1Score: newT1Score,
+              team2Score: newT2Score,
+              turnScore: 0,
+              hasRolled: false,
+              dieRoll: 0,
+              winner: winner,
+            };
+          });
+          generateNextCard(activeGame);
+        };
+
+        const exitGame = () => {
+          setActiveGame(null);
+          setCurrentCard(null);
+          setIsActive(false);
+          setTimeLeft(0);
+          setGameState((prev) => ({ ...prev, phase: "setup" }));
+          // Return to lobby if networked
+          if (peer) setAppMode("lobby");
+          else setAppMode("landing");
+        };
+
+        // --- Render Logic ---
+
+        if (appMode === "landing") {
+          return (
+            <LandingScreen
+              onSetRole={(r) => {
+                setRole(r);
+                if (r === "gm") initializeGM();
+                else setAppMode("join"); // Go to join screen first
+              }}
+            />
+          );
+        }
+
+        if (appMode === "join") {
+          return (
+            <PlayerJoinScreen
+              onJoin={(key, name) => initializePlayer(key, name)}
+              onBack={() => {
+                setAppMode("landing");
+                setRole(null);
+              }}
+            />
+          );
+        }
+
+        if (appMode === "lobby") {
+          return (
+            <LobbyScreen
+              role={role}
+              roomKey={roomKey}
+              players={players}
+              onStartGame={handleStartGame}
+              onLeave={handleExit}
+            />
+          );
+        }
+
+        // --- Game Modes (Only rendered if appMode === 'game') ---
+
+        if (gameState.phase === "setup") {
+          return (
+            <div className="max-w-md mx-auto p-6 pt-12 pb-24 animate-fade-in no-select">
+              <header className="mb-10 text-center space-y-4">
+                <div className="inline-block p-4 bg-emerald-500/10 rounded-[2rem] border border-emerald-500/20 shadow-2xl">
+                  <Icon name="trophy" size={48} className="text-emerald-500" />
+                </div>
+                <div>
+                  <h1 className="text-4xl font-black tracking-tighter italic text-white leading-none uppercase">
+                    Ultimate
+                  </h1>
+                  <h1 className="text-4xl font-black tracking-tighter italic text-emerald-500 leading-none uppercase">
+                    Games Night
+                  </h1>
+                </div>
+                <button
+                  onClick={exitGame}
+                  className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-4"
+                >
+                  Back to Lobby
+                </button>
+              </header>
+              <div className="space-y-3">
+                <MenuButton
+                  title="30 SECONDS"
+                  description="Race to 30! Dice roll penalties included."
+                  count={GAMES_DATA.THIRTY_SECONDS.length}
+                  icon="timer"
+                  color="bg-gradient-to-br from-emerald-600 to-emerald-800"
+                  onClick={() => selectGame("THIRTY_SECONDS")}
+                />
+                <MenuButton
+                  title="TABOO"
+                  description="Member rotation mode. Points win."
+                  count={GAMES_DATA.TABOO.length}
+                  icon="x-circle"
+                  color="bg-gradient-to-br from-rose-600 to-rose-800"
+                  onClick={() => selectGame("TABOO")}
+                />
+                <div className="pt-4 pb-2 border-t border-gray-900 mt-6 mb-4 text-center">
+                  <p className="text-[10px] font-black text-gray-700 uppercase tracking-[0.3em]">
+                    Party Games
+                  </p>
+                </div>
+                <MenuButton
+                  title="MOST LIKELY"
+                  description="Point at your friends!"
+                  count={GAMES_DATA.MOST_LIKELY.length}
+                  icon="user-round"
+                  color="bg-gradient-to-br from-blue-600 to-blue-800"
+                  onClick={() => selectGame("MOST_LIKELY")}
+                />
+                <MenuButton
+                  title="ACT IT OUT"
+                  description="Classic Charades logic."
+                  count={GAMES_DATA.CHARADES.length}
+                  icon="drama"
+                  color="bg-gradient-to-br from-purple-600 to-purple-800"
+                  onClick={() => selectGame("CHARADES")}
+                />
+                <MenuButton
+                  title="LIE OR TRUTH"
+                  description="Who's telling the truth?"
+                  count={GAMES_DATA.TRUTH_LIE.length}
+                  icon="message-square-quote"
+                  color="bg-gradient-to-br from-amber-500 to-amber-700"
+                  onClick={() => selectGame("TRUTH_LIE")}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        if (gameState.phase === "taboo_setup") {
+          return (
+            <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
+              <div className="bg-rose-500/10 p-6 rounded-full border border-rose-500/20">
+                <Icon name="users" size={64} className="text-rose-500" />
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                  Taboo Setup
+                </h1>
+                <p className="text-gray-400 font-bold text-sm">
+                  How many players are on each team?
+                </p>
+              </div>
+              <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => startTaboo(n)}
+                    className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={exitGame}
+                className="text-gray-500 uppercase font-black text-[10px] tracking-widest"
+              >
+                Cancel
+              </button>
+            </div>
+          );
+        }
+
+        if (gameState.phase === "ready") {
+          return (
+            <div className="h-screen flex flex-col items-center justify-center text-center p-6 space-y-6 animate-fade-in no-select">
+              <div className="space-y-1">
+                <p className="text-emerald-500 font-black uppercase tracking-[0.3em] text-xs">
+                  {activeGame === "TABOO"
+                    ? `Round ${gameState.round} of ${gameState.maxRounds}`
+                    : `Round ${gameState.round}`}
+                </p>
+                <h1 className="text-6xl font-black italic tracking-tighter text-white uppercase leading-none">
+                  Team {gameState.currentTeam}
+                </h1>
+                {activeGame === "TABOO" && (
+                  <p className="text-rose-500 font-black uppercase tracking-widest text-sm mt-2 animate-pulse">
+                    Player {gameState.currentPlayerIndex}'s Turn
+                  </p>
+                )}
+              </div>
+              <Scoreboard
+                t1={gameState.team1Score}
+                t2={gameState.team2Score}
+                goal={gameState.gameGoal}
+                isRace={activeGame === "THIRTY_SECONDS"}
+              />
+              {activeGame === "THIRTY_SECONDS" && (
+                <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-[2.5rem] w-full max-w-xs flex flex-col items-center gap-4">
+                  {!gameState.hasRolled ? (
+                    <>
+                      <div
+                        className={`w-20 h-20 bg-emerald-500 flex items-center justify-center rounded-2xl shadow-lg ${
+                          isRolling ? "die-animation" : ""
+                        }`}
+                      >
+                        <Icon name="dice-5" size={40} className="text-black" />
+                      </div>
+                      <button
+                        onClick={rollDice}
+                        disabled={isRolling}
+                        className="bg-white text-black font-black px-6 py-2 rounded-full text-sm uppercase tracking-widest active:scale-95 transition-all"
+                      >
+                        {isRolling ? "Rolling..." : "Roll Dice"}
+                      </button>
+                      <p className="text-gray-500 text-[10px] uppercase font-bold px-4 leading-tight italic">
+                        Penalty roll subtracted from score.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        You Rolled:
+                      </div>
+                      <div className="text-7xl font-black text-white">
+                        {gameState.dieRoll}
+                      </div>
+                      <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                        Ready to go!
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+              <button
+                onClick={startTurn}
+                disabled={
+                  activeGame === "THIRTY_SECONDS" && !gameState.hasRolled
+                }
+                className={`w-full max-w-xs py-6 rounded-3xl text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 font-black uppercase ${
+                  activeGame === "THIRTY_SECONDS" && !gameState.hasRolled
+                    ? "bg-gray-800 text-gray-600"
+                    : "bg-emerald-500 text-black"
+                }`}
+              >
+                Start Turn
+              </button>
+              <button
+                onClick={exitGame}
+                className="text-gray-600 text-[10px] font-bold uppercase tracking-widest"
+              >
+                Exit Game
+              </button>
+            </div>
+          );
+        }
+
+        if (gameState.phase === "summary") {
+          const moveAmount =
+            activeGame === "THIRTY_SECONDS"
+              ? Math.max(0, gameState.turnScore - gameState.dieRoll)
+              : gameState.turnScore;
+          return (
+            <div className="h-screen flex flex-col items-center justify-center text-center p-6 space-y-8 animate-fade-in no-select">
+              <div className="bg-emerald-500/10 p-8 rounded-full border border-emerald-500/20">
+                <Icon
+                  name="check-circle-2"
+                  size={64}
+                  className="text-emerald-500"
+                />
+              </div>
+              <div className="w-full max-w-xs space-y-4">
+                <h1 className="text-3xl font-black text-white uppercase italic">
+                  Turn Results
+                </h1>
+                <div className="bg-gray-900 border border-gray-800 p-6 rounded-3xl space-y-2">
+                  <div className="flex justify-between items-center text-gray-400 font-bold uppercase text-xs">
+                    <span>Guesses:</span>
+                    <span className="text-white text-xl">
+                      {gameState.turnScore}
+                    </span>
+                  </div>
+                  {activeGame === "THIRTY_SECONDS" && (
+                    <div className="flex justify-between items-center text-gray-400 font-bold uppercase text-xs">
+                      <span>Dice:</span>
+                      <span className="text-red-500 text-xl">
+                        -{gameState.dieRoll}
+                      </span>
+                    </div>
+                  )}
+                  <div className="h-px bg-gray-800 my-2" />
+                  <div className="flex justify-between items-center text-emerald-500 font-black uppercase text-lg tracking-tighter">
+                    <span>Points:</span>
+                    <span className="text-3xl">+{moveAmount}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={nextTeam}
+                className="w-full max-w-xs bg-white text-black font-black py-6 rounded-3xl text-xl active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg uppercase tracking-tighter"
+              >
+                Next Team <Icon name="chevron-right" size={24} />
+              </button>
+            </div>
+          );
+        }
+
+        if (gameState.phase === "winner") {
+          const isDraw = gameState.winner === "Draw";
+          return (
+            <div className="h-screen flex flex-col items-center justify-center text-center p-8 space-y-10 animate-fade-in no-select bg-emerald-950">
+              <div className="relative">
+                <Icon
+                  name={isDraw ? "hand" : "trophy"}
+                  size={120}
+                  className="text-emerald-400 drop-shadow-[0_0_20px_rgba(52,211,153,0.5)]"
+                />
+                {!isDraw && (
+                  <div className="absolute -top-4 -right-4 bg-white text-black px-4 py-1 rounded-full font-black text-xs uppercase italic tracking-widest rotate-12">
+                    Winner
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-7xl font-black text-white italic tracking-tighter uppercase leading-none">
+                  {gameState.winner}
+                </h1>
+                <p className="text-emerald-200 font-bold uppercase tracking-[0.3em] text-sm">
+                  {isDraw ? "Draw!" : "Victory!"}
+                </p>
+                <div className="mt-4 flex gap-4 justify-center">
+                  <div className="text-white font-bold uppercase text-xs tracking-widest border-r border-white/20 pr-4">
+                    Team 1: {gameState.team1Score}
+                  </div>
+                  <div className="text-white font-bold uppercase text-xs tracking-widest">
+                    Team 2: {gameState.team2Score}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={exitGame}
+                className="bg-white text-black font-black w-full max-w-xs py-6 rounded-3xl text-xl uppercase tracking-tighter active:scale-95 transition-all shadow-2xl"
+              >
+                Main Menu
+              </button>
+            </div>
+          );
+        }
+
+        // In-Game Play UI
+        const isCompetitive =
+          activeGame === "THIRTY_SECONDS" || activeGame === "TABOO";
+        return (
+          <div className="h-screen flex flex-col p-6 animate-fade-in no-select">
+            <header className="flex items-center justify-between mb-4">
+              <button
+                onClick={exitGame}
+                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800"
+              >
+                <Icon name="arrow-left" size={20} />
+              </button>
+              <div className="text-center">
+                <h1 className="text-lg font-black text-emerald-400 uppercase tracking-tighter leading-tight">
+                  {activeGame.replace("_", " ")}
+                </h1>
+                {isCompetitive && (
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                    Team {gameState.currentTeam}
+                    {activeGame === "TABOO" &&
+                      ` • P${gameState.currentPlayerIndex}`}
+                  </p>
+                )}
+              </div>
+              <div className="w-12 h-12 flex items-center justify-center bg-gray-900 rounded-full font-black text-emerald-500 border border-emerald-500/20">
+                {gameState.turnScore}
+              </div>
+            </header>
+
+            {timeLeft > 0 && (
+              <div
+                className={`relative flex items-center justify-center mb-4 p-4 rounded-2xl border-2 transition-all ${
+                  !isActive
+                    ? "border-amber-500 bg-amber-500/10"
+                    : timeLeft < 10
+                    ? "border-red-500 bg-red-500/10"
+                    : "border-emerald-500/20 bg-emerald-500/5"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-4">
+                  <button
+                    onClick={togglePause}
+                    className="p-3 bg-white/10 rounded-full hover:bg-white/20 active:scale-90 transition-all"
+                  >
+                    <Icon
+                      name={isActive ? "pause" : "play"}
+                      size={20}
+                      className={isActive ? "text-white" : "text-amber-500"}
+                      fill="currentColor"
+                    />
+                  </button>
+                  <div className="flex flex-col">
+                    <span
+                      className={`text-5xl font-black tabular-nums leading-none ${
+                        !isActive
+                          ? "text-amber-500"
+                          : timeLeft < 10
+                          ? "text-red-500"
+                          : "text-white"
+                      }`}
+                    >
+                      {timeLeft}s
+                    </span>
+                    {!isActive && (
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest text-center mt-1">
+                        Paused
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex-grow flex flex-col justify-center items-center bg-gray-900 border border-gray-800 rounded-[3rem] shadow-2xl p-8 mb-4 text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-20" />
+
+              {activeGame === "THIRTY_SECONDS" && currentCard && (
+                <div className="w-full py-4">
+                  <h2 className="text-5xl font-black text-white uppercase tracking-tighter leading-tight drop-shadow-xl">
+                    {currentCard}
+                  </h2>
+                </div>
+              )}
+
+              {activeGame === "TABOO" && currentCard && (
+                <div className="w-full">
+                  <div className="bg-emerald-500/10 py-6 px-4 rounded-3xl border border-emerald-500/30 mb-6">
+                    <h2 className="text-4xl font-black text-white uppercase tracking-tighter leading-none">
+                      {currentCard.word}
+                    </h2>
+                  </div>
+                  <p className="text-[10px] uppercase font-bold text-red-500 mb-4 tracking-widest opacity-80 uppercase">
+                    Forbidden Words:
+                  </p>
+                  <div className="space-y-3">
+                    {(currentCard.forbidden || []).map((f, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-center gap-2 text-lg font-semibold text-gray-400 italic"
+                      >
+                        <Icon
+                          name="x-circle"
+                          size={14}
+                          className="text-red-500/30"
+                        />
+                        <span>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!isCompetitive && (
+                <h3 className="text-3xl font-bold text-white leading-snug">
+                  {currentCard}
+                </h3>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              {isCompetitive ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={handlePass}
+                    disabled={!isActive}
+                    className={`font-bold py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-xs ${
+                      !isActive
+                        ? "bg-gray-800 text-gray-600"
+                        : "bg-gray-800 text-white active:bg-gray-700"
+                    }`}
+                  >
+                    <Icon name="skip-forward" size={18} /> Pass
+                  </button>
+                  <button
+                    onClick={handleCorrect}
+                    disabled={!isActive}
+                    className={`font-black py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-tighter text-xl shadow-lg ${
+                      !isActive
+                        ? "bg-gray-800 text-gray-600"
+                        : "bg-emerald-500 text-black active:scale-95"
+                    }`}
+                  >
+                    <Icon name="plus" size={20} /> Correct
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => generateNextCard(activeGame)}
+                  className="w-full bg-emerald-500 text-black font-black py-6 rounded-3xl text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2 uppercase tracking-tighter"
+                >
+                  Next Prompt <Icon name="chevron-right" size={24} />
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      // --- SUB-COMPONENTS ---
+
+      const Scoreboard = ({ t1, t2, goal, isRace }) => (
+        <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4 max-w-lg m-auto">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
+              {isRace ? "Race Progress" : "Points Tally"}
+            </span>
+            {isRace && (
+              <span className="text-[10px] font-bold text-gray-500 uppercase">
+                Goal: {goal}
+              </span>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="relative h-4 bg-black rounded-full overflow-hidden border border-gray-800">
+              <div
+                className="absolute top-0 left-0 h-full bg-emerald-600 transition-all duration-1000"
+                style={{
+                  width: isRace
+                    ? `${Math.min(100, (t1 / goal) * 100)}%`
+                    : "100%",
+                }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white uppercase tracking-tight">
+                Team 1: {t1}
+              </span>
+            </div>
+            <div className="relative h-4 bg-black rounded-full overflow-hidden border border-gray-800">
+              <div
+                className="absolute top-0 left-0 h-full bg-blue-600 transition-all duration-1000"
+                style={{
+                  width: isRace
+                    ? `${Math.min(100, (t2 / goal) * 100)}%`
+                    : "100%",
+                }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white uppercase tracking-tight">
+                Team 2: {t2}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
