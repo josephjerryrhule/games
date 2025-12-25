@@ -224,9 +224,9 @@
         players,
         onStartGame,
         onLeave,
-        statusMsg,
       }) => {
         const [copied, setCopied] = useState(false);
+        const [showTabooSetup, setShowTabooSetup] = useState(false);
 
         const copyKey = () => {
           if (navigator.clipboard) {
@@ -235,6 +235,49 @@
             setTimeout(() => setCopied(false), 2000);
           }
         };
+
+        const handleGameSelect = (gameKey) => {
+          if (gameKey === "TABOO") {
+            setShowTabooSetup(true);
+          } else {
+            onStartGame(gameKey);
+          }
+        };
+
+        if (showTabooSetup) {
+          return (
+            <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
+              <div className="bg-rose-500/10 p-6 rounded-full border border-rose-500/20">
+                <span className="text-5xl">👥</span>
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                  Taboo Setup
+                </h1>
+                <p className="text-gray-400 font-bold text-sm">
+                  How many players are on each team?
+                </p>
+              </div>
+              <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => onStartGame("TABOO", { teamSize: n })}
+                    className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowTabooSetup(false)}
+                className="text-gray-500 uppercase font-black text-[10px] tracking-widest"
+              >
+                Cancel
+              </button>
+            </div>
+          );
+        }
 
         return (
           <div className="h-screen flex flex-col p-6 animate-fade-in no-select">
@@ -252,43 +295,37 @@
               </div>
             </header>
 
-            <div className="flex-1 flex flex-col items-center gap-8">
-              {/* Room Key Section (Prominent for GM) */}
-              <div className="w-full max-w-lg text-center space-y-2">
+            <div className="flex-1 flex flex-col items-center gap-6 overflow-hidden">
+              {/* Room Info */}
+              <div className="w-full max-w-lg text-center space-y-2 flex-shrink-0">
                 <p className="text-gray-500 font-bold text-[10px] uppercase tracking-widest">
                   Room Access Key
                 </p>
                 <div
                   onClick={copyKey}
-                  className="bg-gray-900 border border-gray-800 p-6 rounded-[2rem] relative active:scale-95 transition-transform cursor-pointer group"
+                  className="bg-gray-900 border border-gray-800 p-4 rounded-[1.5rem] relative active:scale-95 transition-transform cursor-pointer group"
                 >
-                  <h2 className="text-4xl font-black text-white tracking-widest uppercase">
+                  <h2 className="text-3xl font-black text-white tracking-widest uppercase">
                     {roomKey || "..."}
                   </h2>
-                  <div className="absolute top-1/2 -translate-y-1/2 right-6 text-gray-600 group-hover:text-emerald-500 transition-colors font-bold text-[10px]">
+                  <div className="absolute top-1/2 -translate-y-1/2 right-4 text-gray-600 group-hover:text-emerald-500 transition-colors font-bold text-[10px]">
                     {copied ? "COPIED" : "COPY"}
                   </div>
                 </div>
-                {copied && (
-                  <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                    Copied to clipboard!
-                  </p>
-                )}
               </div>
 
               {/* Players List */}
-              <div className="w-full max-w-xs flex-1 flex flex-col overflow-hidden">
-                <div className="flex items-center gap-3 mb-4">
+              <div className="w-full max-w-xs flex flex-col flex-shrink-0 h-48">
+                <div className="flex items-center gap-3 mb-2">
                   <span className="text-gray-400">👥</span>
                   <h3 className="text-white font-black uppercase italic tracking-tighter">
                     Players ({players.length})
                   </h3>
                 </div>
-
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                <div className="flex-1 overflow-y-auto space-y-2 pr-2 border-b border-gray-800 pb-2">
                   {players.length === 0 ? (
-                    <div className="text-center p-8 border border-dashed border-gray-800 rounded-3xl">
-                      <p className="text-gray-600 font-bold text-xs uppercase tracking-wide">
+                    <div className="text-center p-4 border border-dashed border-gray-800 rounded-xl">
+                      <p className="text-gray-600 font-bold text-[10px] uppercase tracking-wide">
                         Waiting for players...
                       </p>
                     </div>
@@ -296,36 +333,76 @@
                     players.map((p, i) => (
                       <div
                         key={i}
-                        className="bg-gray-900/50 p-4 rounded-2xl flex items-center justify-between border border-gray-800"
+                        className="bg-gray-900/50 p-3 rounded-xl flex items-center justify-between border border-gray-800"
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-white font-bold">{p.name}</span>
+                          <span className="text-white font-bold text-sm">
+                            {p.name}
+                          </span>
                         </div>
-                        {/* Role badge if needed, currently assumes all joined are 'players' */}
                       </div>
                     ))
                   )}
                 </div>
               </div>
 
-              {/* Action Area */}
-              <div className="w-full max-w-xs pt-4">
-                {role === "gm" ? (
-                  <button
-                    onClick={onStartGame}
-                    className="w-full bg-emerald-500 text-black font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
-                  >
-                    ▶ Start Game Night
-                  </button>
-                ) : (
-                  <div className="text-center p-4 bg-gray-900 rounded-2xl border border-gray-800 animate-pulse">
-                    <p className="text-emerald-500 font-black text-xs uppercase tracking-widest">
-                      Waiting for Host...
+              {/* Game Selection (GM Only) */}
+              {role === "gm" ? (
+                <div className="w-full max-w-xs flex-1 overflow-y-auto space-y-3 pb-8">
+                  <p className="text-center text-gray-500 font-bold text-[10px] uppercase tracking-widest sticky top-0 bg-black pt-2 pb-2">
+                    Select Game to Start
+                  </p>
+                  <MenuButton
+                    title="30 SECONDS"
+                    description="Race to 30! Dice roll penalties."
+                    count={GAMES_DATA.THIRTY_SECONDS.length}
+                    color="bg-gradient-to-br from-emerald-600 to-emerald-800"
+                    onClick={() => handleGameSelect("THIRTY_SECONDS")}
+                  />
+                  <MenuButton
+                    title="TABOO"
+                    description="Member rotation mode."
+                    count={GAMES_DATA.TABOO.length}
+                    color="bg-gradient-to-br from-rose-600 to-rose-800"
+                    onClick={() => handleGameSelect("TABOO")}
+                  />
+                  <div className="pt-4 pb-2 border-t border-gray-900 mt-6 mb-4 text-center">
+                    <p className="text-[10px] font-black text-gray-700 uppercase tracking-[0.3em]">
+                      Party Games
                     </p>
                   </div>
-                )}
-              </div>
+                  <MenuButton
+                    title="MOST LIKELY"
+                    description="Point at your friends!"
+                    count={GAMES_DATA.MOST_LIKELY.length}
+                    color="bg-gradient-to-br from-blue-600 to-blue-800"
+                    onClick={() => handleGameSelect("MOST_LIKELY")}
+                  />
+                  <MenuButton
+                    title="ACT IT OUT"
+                    description="Classic Charades logic."
+                    count={GAMES_DATA.CHARADES.length}
+                    color="bg-gradient-to-br from-purple-600 to-purple-800"
+                    onClick={() => handleGameSelect("CHARADES")}
+                  />
+                  <MenuButton
+                    title="LIE OR TRUTH"
+                    description="Who's telling the truth?"
+                    count={GAMES_DATA.TRUTH_LIE.length}
+                    color="bg-gradient-to-br from-amber-500 to-amber-700"
+                    onClick={() => handleGameSelect("TRUTH_LIE")}
+                  />
+                </div>
+              ) : (
+                <div className="w-full max-w-xs flex-1 flex items-center justify-center">
+                  <div className="text-center p-8 bg-gray-900 rounded-3xl border border-gray-800 animate-pulse">
+                    <p className="text-emerald-500 font-black text-xs uppercase tracking-widest">
+                      Waiting for Host to start...
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1578,6 +1655,9 @@
           };
         }, [peer]);
 
+        // Use a ref to track connections for reliable broadcasting (avoids stale closure)
+        const connectionsRef = useRef([]);
+
         const initializeGM = () => {
           const newPeer = new Peer();
           newPeer.on("open", (id) => {
@@ -1591,32 +1671,58 @@
               const playerName = conn.metadata?.name || "Unknown";
               const newPlayer = { id: conn.peer, name: playerName };
 
+              // Add connection to ref immediately
+              connectionsRef.current = [...connectionsRef.current, conn];
+              setConnections((prev) => [...prev, conn]);
+
               setPlayers((prev) => {
                 const updated = [...prev, newPlayer];
-                // Broadcast new player list to ALL connections
+                // Broadcast new player list to ALL connections using ref
                 const payload = { type: "UPDATE_PLAYERS", players: updated };
-                [...connections, conn].forEach((c) => c.send(payload));
+                connectionsRef.current.forEach((c) => c.send(payload));
                 return updated;
               });
-
-              setConnections((prev) => [...prev, conn]);
             });
 
             conn.on("data", (data) => {
-              // Handle data from players if needed (e.g. buzzer, answers)
+              // Handle data from players - relay to all
               console.log("GM Received:", data);
+
+              if (data.type === "SYNC_TURN_ACTION") {
+                // Apply action locally for Host
+                if (data.action === "start") {
+                  setGameState((prev) => ({
+                    ...prev,
+                    phase: "playing",
+                    turnScore: 0,
+                  }));
+                  setTimeLeft(data.time || 30);
+                  setIsActive(true);
+                } else if (data.action === "roll") {
+                  setGameState((prev) => ({
+                    ...prev,
+                    dieRoll: data.dieRoll,
+                    hasRolled: true,
+                  }));
+                }
+
+                // Relay to all other players
+                connectionsRef.current.forEach((c) => c.send(data));
+              }
             });
 
             conn.on("close", () => {
+              // Remove connection from ref
+              connectionsRef.current = connectionsRef.current.filter(
+                (c) => c.peer !== conn.peer
+              );
+
               // Remove player
               setPlayers((prev) => {
                 const updated = prev.filter((p) => p.id !== conn.peer);
-                // Broadcast update
-                connections
-                  .filter((c) => c.peer !== conn.peer)
-                  .forEach((c) =>
-                    c.send({ type: "UPDATE_PLAYERS", players: updated })
-                  );
+                // Broadcast update using ref
+                const payload = { type: "UPDATE_PLAYERS", players: updated };
+                connectionsRef.current.forEach((c) => c.send(payload));
                 return updated;
               });
               setConnections((prev) =>
@@ -1644,11 +1750,70 @@
               }
               if (data.type === "START_GAME") {
                 setAppMode("game");
+                setActiveGame(data.game);
+
+                // If options are provided (like Taboo team size), we need to respect them if they aren't part of gameState default
+                // But gameState spread below handles it if data.options passed appropriately or mapped
+
                 setGameState((prev) => ({
                   ...prev,
-                  phase: "setup",
-                  teams: data.teams || prev.teams,
+                  phase: data.phase || "ready",
+                  teams: data.teams,
+                  teamSize: data.options?.teamSize || prev.teamSize,
+                  round: 1,
+                  turnScore: 0,
+                  dieRoll: 0,
+                  hasRolled: false,
+                  winner: null,
                 }));
+
+                if (data.initialCard) {
+                  setCurrentCard(data.initialCard);
+                }
+              }
+              if (data.type === "SYNC_GAME_STATE") {
+                // Sync game state from Host (e.g., after nextTeam)
+                if (data.gameState) {
+                  setGameState(data.gameState);
+                }
+                if (data.card !== undefined) {
+                  setCurrentCard(data.card);
+                }
+              }
+              if (data.type === "SYNC_TURN_ACTION") {
+                // Handle real-time turn actions from Host
+                if (data.action === "start") {
+                  setGameState((prev) => ({
+                    ...prev,
+                    phase: "playing",
+                    turnScore: 0,
+                  }));
+                  setTimeLeft(data.time || 30);
+                  setIsActive(true);
+                } else if (data.action === "end") {
+                  setIsActive(false);
+                  setGameState((prev) => ({ ...prev, phase: "summary" }));
+                } else if (data.action === "roll") {
+                  setGameState((prev) => ({
+                    ...prev,
+                    dieRoll: data.dieRoll,
+                    hasRolled: true,
+                  }));
+                } else if (data.action === "correct") {
+                  if (data.score !== undefined) {
+                    setGameState((prev) => ({
+                      ...prev,
+                      turnScore: data.score,
+                    }));
+                  }
+                  if (data.card !== undefined) {
+                    setCurrentCard(data.card);
+                  }
+                } else if (data.action === "pass") {
+                  if (data.card !== undefined) {
+                    setCurrentCard(data.card);
+                  }
+                }
               }
               // Handle other game state syncs here
             });
@@ -1664,8 +1829,10 @@
           setPeer(newPeer);
         };
 
-        const handleStartGame = () => {
+        const handleStartGame = (gameKey, options = {}) => {
           // Shuffle and Assign Teams
+          // HOST IS EXCLUDED -> Only shuffle 'players' list
+
           const shuffled = [...players].sort(() => 0.5 - Math.random());
           const half = Math.ceil(shuffled.length / 2);
           const newTeams = {
@@ -1673,16 +1840,44 @@
             2: shuffled.slice(half).map((p) => p.id),
           };
 
-          setGameState((prev) => ({ ...prev, teams: newTeams }));
+          // Game Specific Setup
+          const isCompetitive = gameKey === "THIRTY_SECONDS";
+          const newPhase = isCompetitive ? "ready" : "playing";
+
+          // Generate first card
+          let initialCard = null;
+          const gameData = GAMES_DATA[gameKey];
+          if (gameData && gameData.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameData.length);
+            initialCard = gameData[randomIndex];
+          }
+
+          setActiveGame(gameKey);
+          setGameState((prev) => ({
+            ...prev,
+            teams: newTeams,
+            phase: newPhase,
+            teamSize: options.teamSize || prev.teamSize,
+            round: 1,
+            turnScore: 0,
+            dieRoll: 0,
+            hasRolled: false,
+            winner: null,
+          }));
+          setCurrentCard(initialCard);
           setAppMode("game");
 
           // Broadcast start with teams
-          connections.forEach((c) =>
-            c.send({
-              type: "START_GAME",
-              teams: newTeams,
-            })
-          );
+          const startPayload = {
+            type: "START_GAME",
+            game: gameKey,
+            teams: newTeams,
+            options: options,
+            phase: newPhase,
+            initialCard: initialCard,
+          };
+
+          connections.forEach((c) => c.send(startPayload));
         };
 
         const handleExit = () => {
@@ -1706,47 +1901,6 @@
           }
           return () => clearInterval(timerRef.current);
         }, [isActive, timeLeft]);
-
-        const selectGame = (gameKey) => {
-          setActiveGame(gameKey);
-          if (gameKey === "TABOO") {
-            setGameState((prev) => ({ ...prev, phase: "taboo_setup" }));
-          } else {
-            const isCompetitive = gameKey === "THIRTY_SECONDS";
-            setGameState((prev) => ({
-              ...prev,
-              phase: isCompetitive ? "ready" : "playing",
-              team1Score: 0,
-              team2Score: 0,
-              currentTeam: 1,
-              currentPlayerIndex: 0,
-              verifierIndex: 0,
-              round: 1,
-              turnScore: 0,
-              dieRoll: 0,
-              hasRolled: false,
-              winner: null,
-            }));
-            generateNextCard(gameKey);
-          }
-        };
-
-        const startTaboo = (size) => {
-          setGameState((prev) => ({
-            ...prev,
-            teamSize: size,
-            phase: "ready",
-            team1Score: 0,
-            team2Score: 0,
-            currentTeam: 1,
-            currentPlayerIndex: 0,
-            verifierIndex: 0,
-            round: 1,
-            turnScore: 0,
-            winner: null,
-          }));
-          generateNextCard("TABOO");
-        };
 
         const generateNextCard = (gameKey) => {
           const data = GAMES_DATA[gameKey];
@@ -1779,19 +1933,43 @@
               hasRolled: true,
             }));
             setIsRolling(false);
+
+            // Broadcast dice roll to all players
+            const payload = {
+              type: "SYNC_TURN_ACTION",
+              action: "roll",
+              dieRoll: roll,
+            };
+            if (role === "gm") {
+              connectionsRef.current.forEach((c) => c.send(payload));
+            } else if (myConn) {
+              myConn.send(payload);
+            }
           }, 600);
         };
 
         const startTurn = () => {
-          setGameState((prev) => ({ ...prev, phase: "playing", turnScore: 0 }));
           const time = activeGame === "THIRTY_SECONDS" ? 30 : 60;
+          setGameState((prev) => ({ ...prev, phase: "playing", turnScore: 0 }));
           setTimeLeft(time);
           setIsActive(true);
+
+          // Broadcast START_TURN: Player sends to Host, Host broadcasts to all
+          const payload = { type: "SYNC_TURN_ACTION", action: "start", time };
+          if (role === "gm") {
+            connectionsRef.current.forEach((c) => c.send(payload));
+          } else if (myConn) {
+            myConn.send(payload);
+          }
         };
 
         const endTurn = () => {
           setIsActive(false);
           setGameState((prev) => ({ ...prev, phase: "summary" }));
+
+          // Broadcast END_TURN to all players
+          const payload = { type: "SYNC_TURN_ACTION", action: "end" };
+          connectionsRef.current.forEach((c) => c.send(payload));
         };
 
         const togglePause = () => {
@@ -1799,15 +1977,50 @@
         };
 
         const handleCorrect = () => {
-          setGameState((prev) => ({ ...prev, turnScore: prev.turnScore + 1 }));
-          generateNextCard(activeGame);
+          const newScore = gameState.turnScore + 1;
+          setGameState((prev) => ({ ...prev, turnScore: newScore }));
+
+          // Generate next card
+          const gameData = GAMES_DATA[activeGame];
+          let nextCard = null;
+          if (gameData && gameData.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameData.length);
+            nextCard = gameData[randomIndex];
+          }
+          setCurrentCard(nextCard);
+
+          // Broadcast CORRECT to all players
+          const payload = {
+            type: "SYNC_TURN_ACTION",
+            action: "correct",
+            score: newScore,
+            card: nextCard,
+          };
+          connectionsRef.current.forEach((c) => c.send(payload));
         };
 
         const handlePass = () => {
-          generateNextCard(activeGame);
+          // Generate next card
+          const gameData = GAMES_DATA[activeGame];
+          let nextCard = null;
+          if (gameData && gameData.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameData.length);
+            nextCard = gameData[randomIndex];
+          }
+          setCurrentCard(nextCard);
+
+          // Broadcast PASS to all players
+          const payload = {
+            type: "SYNC_TURN_ACTION",
+            action: "pass",
+            card: nextCard,
+          };
+          connectionsRef.current.forEach((c) => c.send(payload));
         };
 
         const nextTeam = () => {
+          let newGameState = null;
+
           setGameState((prev) => {
             const isTeam1 = prev.currentTeam === 1;
             let winner = null;
@@ -1832,54 +2045,45 @@
               if (isTeam1) newT1Score += prev.turnScore;
               else newT2Score += prev.turnScore;
 
-              // Taboo Logic
-              const currentTIds = prev.teams[prev.currentTeam];
-              const nextTIds = prev.teams[prev.currentTeam === 1 ? 2 : 1];
-
-              // Increment index?
-              // Simplification: Just increment global index or switch teams
-              // If teamSize is set, we might need to check limits
-
               nextTeamNum = isTeam1 ? 2 : 1;
               if (!isTeam1) {
-                // Full round completed (both teams went)
                 nextPlayerIndex = prev.currentPlayerIndex + 1;
-                // Rotate verifier too
-                // verifierIndex update
               }
 
               const newVerifierIndex = prev.verifierIndex + 1;
 
-              // Check if Round complete (all players in team 1 have gone?)
-              // This logic depends on team size.
-              // Let's assume teamSize is accurate.
               if (nextPlayerIndex >= prev.teams[1].length) {
-                nextPlayerIndex = 0; // reset
+                nextPlayerIndex = 0;
                 nextRoundNum = prev.round + 1;
               }
 
-              // Check Winner
               if (nextRoundNum > prev.maxRounds) {
                 if (newT1Score > newT2Score) winner = "Team 1";
                 else if (newT2Score > newT1Score) winner = "Team 2";
                 else winner = "Draw";
               }
 
-              return {
+              newGameState = {
                 ...prev,
                 currentTeam: nextTeamNum,
                 currentPlayerIndex: nextPlayerIndex,
                 verifierIndex: newVerifierIndex,
                 round: nextRoundNum,
-                // ... rest
+                phase: winner ? "winner" : "ready",
+                team1Score: newT1Score,
+                team2Score: newT2Score,
+                turnScore: 0,
+                hasRolled: false,
+                dieRoll: 0,
+                winner: winner,
               };
+              return newGameState;
             }
 
-            return {
+            newGameState = {
               ...prev,
               currentTeam: nextTeamNum,
               currentPlayerIndex: nextPlayerIndex,
-              // ensure verifier index is preserved or updated
               verifierIndex:
                 prev.verifierIndex + (activeGame === "TABOO" ? 1 : 0),
               round: nextRoundNum,
@@ -1891,8 +2095,27 @@
               dieRoll: 0,
               winner: winner,
             };
+            return newGameState;
           });
-          generateNextCard(activeGame);
+
+          // Generate next card
+          const gameData = GAMES_DATA[activeGame];
+          let nextCard = null;
+          if (gameData && gameData.length > 0) {
+            const randomIndex = Math.floor(Math.random() * gameData.length);
+            nextCard = gameData[randomIndex];
+          }
+          setCurrentCard(nextCard);
+
+          // Broadcast state to all players
+          setTimeout(() => {
+            const syncPayload = {
+              type: "SYNC_GAME_STATE",
+              gameState: newGameState,
+              card: nextCard,
+            };
+            connectionsRef.current.forEach((c) => c.send(syncPayload));
+          }, 50);
         };
 
         const exitGame = () => {
@@ -1946,115 +2169,13 @@
 
         // --- Game Modes (Only rendered if appMode === 'game') ---
 
-        if (gameState.phase === "setup") {
-          return (
-            <div className="max-w-md mx-auto p-6 pt-12 pb-24 animate-fade-in no-select">
-              <header className="mb-10 text-center space-y-4">
-                <div className="inline-block p-4 bg-emerald-500/10 rounded-[2rem] border border-emerald-500/20 shadow-2xl">
-                  <span className="text-5xl">🏆</span>
-                </div>
-                <div>
-                  <h1 className="text-4xl font-black tracking-tighter italic text-white leading-none uppercase">
-                    Ultimate
-                  </h1>
-                  <h1 className="text-4xl font-black tracking-tighter italic text-emerald-500 leading-none uppercase">
-                    Games Night
-                  </h1>
-                </div>
-                <button
-                  onClick={exitGame}
-                  className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-4"
-                >
-                  Back to Lobby
-                </button>
-              </header>
-              <div className="space-y-3">
-                <MenuButton
-                  title="30 SECONDS"
-                  description="Race to 30! Dice roll penalties included."
-                  count={GAMES_DATA.THIRTY_SECONDS.length}
-                  icon="timer"
-                  color="bg-gradient-to-br from-emerald-600 to-emerald-800"
-                  onClick={() => selectGame("THIRTY_SECONDS")}
-                />
-                <MenuButton
-                  title="TABOO"
-                  description="Member rotation mode. Points win."
-                  count={GAMES_DATA.TABOO.length}
-                  icon="x-circle"
-                  color="bg-gradient-to-br from-rose-600 to-rose-800"
-                  onClick={() => selectGame("TABOO")}
-                />
-                <div className="pt-4 pb-2 border-t border-gray-900 mt-6 mb-4 text-center">
-                  <p className="text-[10px] font-black text-gray-700 uppercase tracking-[0.3em]">
-                    Party Games
-                  </p>
-                </div>
-                <MenuButton
-                  title="MOST LIKELY"
-                  description="Point at your friends!"
-                  count={GAMES_DATA.MOST_LIKELY.length}
-                  icon="user-round"
-                  color="bg-gradient-to-br from-blue-600 to-blue-800"
-                  onClick={() => selectGame("MOST_LIKELY")}
-                />
-                <MenuButton
-                  title="ACT IT OUT"
-                  description="Classic Charades logic."
-                  count={GAMES_DATA.CHARADES.length}
-                  icon="drama"
-                  color="bg-gradient-to-br from-purple-600 to-purple-800"
-                  onClick={() => selectGame("CHARADES")}
-                />
-                <MenuButton
-                  title="LIE OR TRUTH"
-                  description="Who's telling the truth?"
-                  count={GAMES_DATA.TRUTH_LIE.length}
-                  icon="message-square-quote"
-                  color="bg-gradient-to-br from-amber-500 to-amber-700"
-                  onClick={() => selectGame("TRUTH_LIE")}
-                />
-              </div>
-            </div>
-          );
-        }
-
-        if (gameState.phase === "taboo_setup") {
-          return (
-            <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
-              <div className="bg-rose-500/10 p-6 rounded-full border border-rose-500/20">
-                <span className="text-5xl">👥</span>
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-4xl font-black text-white italic tracking-tighter uppercase">
-                  Taboo Setup
-                </h1>
-                <p className="text-gray-400 font-bold text-sm">
-                  How many players are on each team?
-                </p>
-              </div>
-              <div className="grid grid-cols-4 gap-3 w-full max-w-xs">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => startTaboo(n)}
-                    className="bg-gray-900 border border-gray-800 text-white font-black p-4 rounded-2xl hover:bg-rose-600 hover:border-rose-500 transition-all active:scale-90"
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={exitGame}
-                className="text-gray-500 uppercase font-black text-[10px] tracking-widest"
-              >
-                Cancel
-              </button>
-            </div>
-          );
-        }
-
         if (gameState.phase === "ready") {
+          // Turn Enforcement Logic
+          const isActiveTeam = (
+            gameState.teams[gameState.currentTeam] || []
+          ).includes(myId);
+          const canInteract = role !== "gm" && isActiveTeam;
+
           return (
             <div className="h-screen flex flex-col items-center justify-center text-center p-6 space-y-6 animate-fade-in no-select">
               <div className="space-y-1">
@@ -2066,6 +2187,44 @@
                 <h1 className="text-6xl font-black italic tracking-tighter text-white uppercase leading-none">
                   Team {gameState.currentTeam}
                 </h1>
+
+                {/* Team Members Display */}
+                <div className="flex justify-center gap-8 py-4">
+                  {[1, 2].map((teamNum) => (
+                    <div
+                      key={teamNum}
+                      className={`text-center ${
+                        gameState.currentTeam === teamNum
+                          ? "opacity-100"
+                          : "opacity-40 scale-90"
+                      }`}
+                    >
+                      <h3
+                        className={`font-bold uppercase text-[10px] tracking-widest mb-2 ${
+                          teamNum === 1 ? "text-emerald-500" : "text-blue-500"
+                        }`}
+                      >
+                        Team {teamNum}
+                      </h3>
+                      <div className="space-y-1">
+                        {(gameState.teams[teamNum] || []).map((pid) => {
+                          const p = players.find((pl) => pl.id === pid);
+                          let name = p?.name || "Unknown";
+                          if (pid === myId) name = "You";
+                          return (
+                            <div
+                              key={pid}
+                              className="text-white font-bold text-xs"
+                            >
+                              {name}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 {activeGame === "TABOO" && (
                   <p className="text-rose-500 font-black uppercase tracking-widest text-sm mt-2 animate-pulse">
                     Player {gameState.currentPlayerIndex}'s Turn
@@ -2078,56 +2237,102 @@
                 goal={gameState.gameGoal}
                 isRace={activeGame === "THIRTY_SECONDS"}
               />
-              {activeGame === "THIRTY_SECONDS" && (
-                <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-[2.5rem] w-full max-w-xs flex flex-col items-center gap-4">
-                  {!gameState.hasRolled ? (
+
+              {/* Host/Inactive Team Observer View */}
+              {!canInteract ? (
+                <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-[2.5rem] w-full max-w-xs text-center">
+                  <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
+                    {role === "gm"
+                      ? "Observing..."
+                      : "Waiting for Team " + gameState.currentTeam + "..."}
+                  </p>
+                  <span className="text-4xl mt-4 block">🫣</span>
+                </div>
+              ) : (
+                (() => {
+                  // Only first player on the active team can roll AND start turn
+                  const activeTeamIds =
+                    gameState.teams[gameState.currentTeam] || [];
+                  const isRoller = activeTeamIds[0] === myId;
+
+                  return isRoller ? (
+                    /* ROLLER VIEW - Can roll and start turn */
                     <>
-                      <div
-                        className={`w-20 h-20 bg-emerald-500 flex items-center justify-center rounded-2xl shadow-lg ${
-                          isRolling ? "die-animation" : ""
+                      {activeGame === "THIRTY_SECONDS" && (
+                        <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-[2.5rem] w-full max-w-xs flex flex-col items-center gap-4">
+                          {!gameState.hasRolled ? (
+                            <>
+                              <div
+                                className={`w-20 h-20 bg-emerald-500 flex items-center justify-center rounded-2xl shadow-lg ${
+                                  isRolling ? "die-animation" : ""
+                                }`}
+                              >
+                                <span className="text-4xl text-black">🎲</span>
+                              </div>
+                              <button
+                                onClick={rollDice}
+                                disabled={isRolling}
+                                className="bg-white text-black font-black px-6 py-2 rounded-full text-sm uppercase tracking-widest active:scale-95 transition-all"
+                              >
+                                {isRolling ? "Rolling..." : "Roll Dice"}
+                              </button>
+                              <p className="text-gray-500 text-[10px] uppercase font-bold px-4 leading-tight italic">
+                                Penalty roll subtracted from score.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                You Rolled:
+                              </div>
+                              <div className="text-7xl font-black text-white">
+                                {gameState.dieRoll}
+                              </div>
+                              <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                                Ready to go!
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        onClick={startTurn}
+                        disabled={
+                          activeGame === "THIRTY_SECONDS" &&
+                          !gameState.hasRolled
+                        }
+                        className={`w-full max-w-xs py-6 rounded-3xl text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 font-black uppercase ${
+                          activeGame === "THIRTY_SECONDS" &&
+                          !gameState.hasRolled
+                            ? "bg-gray-800 text-gray-600"
+                            : "bg-emerald-500 text-black"
                         }`}
                       >
-                        <span className="text-4xl text-black">🎲</span>
-                      </div>
-                      <button
-                        onClick={rollDice}
-                        disabled={isRolling}
-                        className="bg-white text-black font-black px-6 py-2 rounded-full text-sm uppercase tracking-widest active:scale-95 transition-all"
-                      >
-                        {isRolling ? "Rolling..." : "Roll Dice"}
+                        Start Turn
                       </button>
-                      <p className="text-gray-500 text-[10px] uppercase font-bold px-4 leading-tight italic">
-                        Penalty roll subtracted from score.
-                      </p>
                     </>
                   ) : (
-                    <>
-                      <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                        You Rolled:
-                      </div>
-                      <div className="text-7xl font-black text-white">
-                        {gameState.dieRoll}
-                      </div>
-                      <p className="text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-                        Ready to go!
+                    /* TEAMMATE VIEW - Waiting for roller */
+                    <div className="bg-gray-900/50 border border-gray-800 p-8 rounded-[2.5rem] w-full max-w-xs text-center">
+                      {activeGame === "THIRTY_SECONDS" &&
+                        gameState.hasRolled && (
+                          <div className="mb-4">
+                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                              Teammate Rolled:
+                            </div>
+                            <div className="text-5xl font-black text-white">
+                              {gameState.dieRoll}
+                            </div>
+                          </div>
+                        )}
+                      <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
+                        Waiting for teammate to start...
                       </p>
-                    </>
-                  )}
-                </div>
+                      <span className="text-4xl mt-4 block">⏳</span>
+                    </div>
+                  );
+                })()
               )}
-              <button
-                onClick={startTurn}
-                disabled={
-                  activeGame === "THIRTY_SECONDS" && !gameState.hasRolled
-                }
-                className={`w-full max-w-xs py-6 rounded-3xl text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3 font-black uppercase ${
-                  activeGame === "THIRTY_SECONDS" && !gameState.hasRolled
-                    ? "bg-gray-800 text-gray-600"
-                    : "bg-emerald-500 text-black"
-                }`}
-              >
-                Start Turn
-              </button>
               <button
                 onClick={exitGame}
                 className="text-gray-600 text-[10px] font-bold uppercase tracking-widest"
@@ -2174,12 +2379,22 @@
                   </div>
                 </div>
               </div>
-              <button
-                onClick={nextTeam}
-                className="w-full max-w-xs bg-white text-black font-black py-6 rounded-3xl text-xl active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg uppercase tracking-tighter"
-              >
-                Next Team ➡
-              </button>
+
+              {/* Only Host can advance to next team */}
+              {role === "gm" ? (
+                <button
+                  onClick={nextTeam}
+                  className="w-full max-w-xs bg-white text-black font-black py-6 rounded-3xl text-xl active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg uppercase tracking-tighter"
+                >
+                  Next Team ➡
+                </button>
+              ) : (
+                <div className="w-full max-w-xs bg-gray-900 border border-gray-800 p-6 rounded-3xl text-center">
+                  <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
+                    Waiting for Host to continue...
+                  </p>
+                </div>
+              )}
             </div>
           );
         }
@@ -2313,10 +2528,8 @@
                   ];
 
                 if (role === "gm") {
-                  // GM sees everything for Taboo, but strictly speaking user said "Only one person... for 30s"
-                  // For Taboo: "and the game master"
-                  if (activeGame === "TABOO") isVisible = true;
-                  else isVisible = false; // GM doesn't see 30s card? User said "Only one person from the corresponding team"
+                  // GM (Host) sees words for ALL games to verify correctness
+                  isVisible = true;
                 } else {
                   if (activeGame === "THIRTY_SECONDS") {
                     if (myId === activePID) isVisible = true;
@@ -2398,30 +2611,77 @@
 
             <div className="space-y-4">
               {isCompetitive ? (
-                <div className="grid grid-cols-2 gap-4">
-                  <button
-                    onClick={handlePass}
-                    disabled={!isActive}
-                    className={`font-bold py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-xs ${
-                      !isActive
-                        ? "bg-gray-800 text-gray-600"
-                        : "bg-gray-800 text-white active:bg-gray-700"
-                    }`}
-                  >
-                    PASS ⏩
-                  </button>
-                  <button
-                    onClick={handleCorrect}
-                    disabled={!isActive}
-                    className={`font-black py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-tighter text-xl shadow-lg ${
-                      !isActive
-                        ? "bg-gray-800 text-gray-600"
-                        : "bg-emerald-500 text-black active:scale-95"
-                    }`}
-                  >
-                    CORRECT ✅
-                  </button>
-                </div>
+                (() => {
+                  // Define who controls the game
+                  const isHost = role === "gm";
+                  const activeTeamIds =
+                    gameState.teams[gameState.currentTeam] || [];
+                  const isActivePlayer = activeTeamIds[0] === myId;
+                  const isTeammate =
+                    activeTeamIds.includes(myId) && !isActivePlayer;
+
+                  if (isHost) {
+                    // HOST: Can mark Correct/Pass
+                    return (
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          onClick={handlePass}
+                          disabled={!isActive}
+                          className={`font-bold py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-widest text-xs ${
+                            !isActive
+                              ? "bg-gray-800 text-gray-600"
+                              : "bg-gray-800 text-white active:bg-gray-700"
+                          }`}
+                        >
+                          PASS ⏩
+                        </button>
+                        <button
+                          onClick={handleCorrect}
+                          disabled={!isActive}
+                          className={`font-black py-5 rounded-3xl flex items-center justify-center gap-2 transition-all uppercase tracking-tighter text-xl shadow-lg ${
+                            !isActive
+                              ? "bg-gray-800 text-gray-600"
+                              : "bg-emerald-500 text-black active:scale-95"
+                          }`}
+                        >
+                          CORRECT ✅
+                        </button>
+                      </div>
+                    );
+                  } else if (isActivePlayer) {
+                    // ACTIVE PLAYER: Reads the words (no buttons)
+                    return (
+                      <div className="text-center py-4 bg-gray-900/50 border border-gray-800 rounded-3xl">
+                        <p className="text-emerald-500 font-black uppercase tracking-widest text-xs">
+                          You're describing!
+                        </p>
+                        <p className="text-gray-500 text-[10px] uppercase mt-2 font-bold">
+                          Host will mark your answers
+                        </p>
+                      </div>
+                    );
+                  } else if (isTeammate) {
+                    // TEAMMATE: Guessing (no words visible)
+                    return (
+                      <div className="text-center py-4 bg-gray-900/50 border border-gray-800 rounded-3xl">
+                        <p className="text-blue-500 font-black uppercase tracking-widest text-xs animate-pulse">
+                          Guess the word!
+                        </p>
+                        <span className="text-2xl block mt-2">🤔</span>
+                      </div>
+                    );
+                  } else {
+                    // OPPOSING TEAM: Just watching
+                    return (
+                      <div className="text-center py-4 bg-gray-900/50 border border-gray-800 rounded-3xl">
+                        <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
+                          Observing...
+                        </p>
+                        <span className="text-2xl block mt-2">👀</span>
+                      </div>
+                    );
+                  }
+                })()
               ) : (
                 <button
                   onClick={() => generateNextCard(activeGame)}
