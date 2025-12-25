@@ -161,13 +161,13 @@
               onClick={() => onSetRole("gm")}
               className="w-full bg-emerald-500 text-black font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-xl active:scale-95 transition-all flex items-center justify-center gap-3"
             >
-              👑 Host Game
+              <Icon name="crown" size={24} strokeWidth={2} /> Host Game
             </button>
             <button
               onClick={() => onSetRole("player")}
               className="w-full bg-gray-900 text-white border border-gray-800 font-black py-5 rounded-3xl text-lg uppercase tracking-tighter shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 hover:bg-gray-800"
             >
-              👋 Join Game
+              <Icon name="user-plus" size={24} strokeWidth={2} /> Join Game
             </button>
           </div>
         </div>
@@ -188,9 +188,9 @@
           <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
             <button
               onClick={onBack}
-              className="absolute top-6 left-6 p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800 font-bold text-xs"
+              className="absolute top-6 left-6 p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800 flex items-center justify-center"
             >
-              ⬅
+              <Icon name="chevron-left" size={20} />
             </button>
             <div className="space-y-2">
               <h1 className="text-3xl font-black text-white italic tracking-tighter uppercase">
@@ -279,9 +279,11 @@
           return (
             <div className="h-screen flex flex-col items-center justify-center p-6 text-center space-y-8 animate-fade-in no-select">
               <div className="bg-rose-500/10 p-6 rounded-full border border-rose-500/20">
-                <span className="text-5xl">
-                  {tabooSetupStep === 1 ? "👥" : "🔄"}
-                </span>
+                <Icon
+                  name={tabooSetupStep === 1 ? "users" : "rotate-cw"}
+                  size={48}
+                  className="text-rose-500"
+                />
               </div>
 
               {tabooSetupStep === 1 && (
@@ -359,9 +361,9 @@
             <header className="flex justify-between items-center mb-8">
               <button
                 onClick={onLeave}
-                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800 font-bold text-xs"
+                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800 flex items-center justify-center font-bold text-xs"
               >
-                ✖
+                <Icon name="x" size={16} />
               </button>
               <div className="bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">
@@ -378,13 +380,19 @@
                 </p>
                 <div
                   onClick={copyKey}
-                  className="bg-gray-900 border border-gray-800 p-4 rounded-[1.5rem] relative active:scale-95 transition-transform cursor-pointer group"
+                  className="bg-gray-900 border border-gray-800 p-4 rounded-[1.5rem] relative active:scale-95 transition-transform cursor-pointer group flex items-center justify-center"
                 >
                   <h2 className="text-3xl font-black text-white tracking-widest uppercase">
                     {roomKey || "..."}
                   </h2>
-                  <div className="absolute top-1/2 -translate-y-1/2 right-4 text-gray-600 group-hover:text-emerald-500 transition-colors font-bold text-[10px]">
-                    {copied ? "COPIED" : "COPY"}
+                  <div className="absolute top-1/2 -translate-y-1/2 right-4 text-gray-600 group-hover:text-emerald-500 transition-colors font-bold text-[10px] flex items-center gap-1">
+                    {copied ? (
+                      "COPIED"
+                    ) : (
+                      <>
+                        <Icon name="copy" size={12} /> COPY
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -392,7 +400,7 @@
               {/* Players List */}
               <div className="w-full max-w-xs flex flex-col flex-shrink-0 h-48">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-gray-400">👥</span>
+                  <Icon name="users" size={16} className="text-gray-400" />
                   <h3 className="text-white font-black uppercase italic tracking-tighter">
                     Players ({players.length})
                   </h3>
@@ -2262,10 +2270,20 @@
 
         if (gameState.phase === "ready") {
           // Turn Enforcement Logic
-          const isActiveTeam = (
-            gameState.teams[gameState.currentTeam] || []
-          ).includes(myId);
-          const canInteract = role !== "gm" && isActiveTeam;
+          const activeTeamIds = gameState.teams[gameState.currentTeam] || [];
+          const activePID =
+            activeTeamIds[gameState.currentPlayerIndex % activeTeamIds.length];
+          const isActivePlayer = myId === activePID;
+          const isActiveTeam = activeTeamIds.includes(myId);
+
+          const activePlayer = players.find((p) => p.id === activePID);
+          const activePlayerName = activePlayer
+            ? activePID === myId
+              ? "You"
+              : activePlayer.name
+            : "Unknown Player";
+
+          const canInteract = role !== "gm" && isActivePlayer;
 
           return (
             <div className="h-screen flex flex-col items-center justify-center text-center p-6 space-y-6 animate-fade-in no-select">
@@ -2278,6 +2296,10 @@
                 <h1 className="text-6xl font-black italic tracking-tighter text-white uppercase leading-none">
                   Team {gameState.currentTeam}
                 </h1>
+
+                <p className="text-rose-500 font-black uppercase tracking-widest text-sm mt-4 animate-pulse">
+                  {activePlayerName}'s Turn
+                </p>
 
                 {/* Team Members Display */}
                 <div className="flex justify-center gap-8 py-4">
@@ -2305,7 +2327,11 @@
                           return (
                             <div
                               key={pid}
-                              className="text-white font-bold text-xs"
+                              className={`text-xs font-bold ${
+                                pid === activePID
+                                  ? "text-white"
+                                  : "text-gray-500"
+                              }`}
                             >
                               {name}
                             </div>
@@ -2315,12 +2341,6 @@
                     </div>
                   ))}
                 </div>
-
-                {activeGame === "TABOO" && (
-                  <p className="text-rose-500 font-black uppercase tracking-widest text-sm mt-2 animate-pulse">
-                    Player {gameState.currentPlayerIndex}'s Turn
-                  </p>
-                )}
               </div>
               <Scoreboard
                 t1={gameState.team1Score}
@@ -2335,16 +2355,20 @@
                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
                     {role === "gm"
                       ? "Observing..."
+                      : isActiveTeam
+                      ? "Wait for " + activePlayerName + "..."
                       : "Waiting for Team " + gameState.currentTeam + "..."}
                   </p>
-                  <span className="text-4xl mt-4 block">🫣</span>
+                  <Icon
+                    name="eye-off"
+                    size={40}
+                    className="text-gray-700 mt-4 opacity-50"
+                  />
                 </div>
               ) : (
                 (() => {
-                  // Only first player on the active team can roll AND start turn
-                  const activeTeamIds =
-                    gameState.teams[gameState.currentTeam] || [];
-                  const isRoller = activeTeamIds[0] === myId;
+                  // Only designated player whose turn it is can roll AND start
+                  const isRoller = myId === activePID;
 
                   return isRoller ? (
                     /* ROLLER VIEW - Can roll and start turn */
@@ -2447,7 +2471,11 @@
           return (
             <div className="h-screen flex flex-col items-center justify-center text-center p-6 space-y-8 animate-fade-in no-select">
               <div className="bg-emerald-500/10 p-8 rounded-full border border-emerald-500/20">
-                <span className="text-6xl">✅</span>
+                <Icon
+                  name="check-circle"
+                  size={64}
+                  className="text-emerald-500"
+                />
               </div>
               <div className="w-full max-w-xs space-y-4">
                 <h1 className="text-3xl font-black text-white uppercase italic">
@@ -2478,12 +2506,46 @@
 
               {/* Only Host can advance to next team */}
               {role === "gm" ? (
-                <button
-                  onClick={nextTeam}
-                  className="w-full max-w-xs bg-white text-black font-black py-6 rounded-3xl text-xl active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg uppercase tracking-tighter"
-                >
-                  Next Team ➡
-                </button>
+                (() => {
+                  const isTeam1 = gameState.currentTeam === 1;
+                  const newT1Score = isTeam1
+                    ? gameState.team1Score + moveAmount
+                    : gameState.team1Score;
+                  const newT2Score = !isTeam1
+                    ? gameState.team2Score + moveAmount
+                    : gameState.team2Score;
+
+                  let isGameOver = false;
+                  if (activeGame === "THIRTY_SECONDS") {
+                    isGameOver =
+                      newT1Score >= gameState.gameGoal ||
+                      newT2Score >= gameState.gameGoal;
+                  } else if (activeGame === "TABOO") {
+                    const isLastTurnOfRound =
+                      !isTeam1 &&
+                      gameState.currentPlayerIndex ===
+                        gameState.teams[2]?.length - 1;
+                    const isLastRound = gameState.round >= gameState.maxRounds;
+                    isGameOver = isLastTurnOfRound && isLastRound;
+                  }
+
+                  return (
+                    <button
+                      onClick={nextTeam}
+                      className="w-full max-w-xs bg-white text-black font-black py-6 rounded-3xl text-xl active:scale-95 transition-all flex items-center justify-center gap-3 shadow-lg uppercase tracking-tighter"
+                    >
+                      {isGameOver ? (
+                        <>
+                          Reveal Winner <Icon name="trophy" size={24} />
+                        </>
+                      ) : (
+                        <>
+                          Next Team <Icon name="chevron-right" size={24} />
+                        </>
+                      )}
+                    </button>
+                  );
+                })()
               ) : (
                 <div className="w-full max-w-xs bg-gray-900 border border-gray-800 p-6 rounded-3xl text-center">
                   <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
@@ -2500,9 +2562,11 @@
           return (
             <div className="h-screen flex flex-col items-center justify-center text-center p-8 space-y-10 animate-fade-in no-select bg-emerald-950">
               <div className="relative">
-                <span className="text-8xl filter drop-shadow-[0_0_20px_rgba(52,211,153,0.5)]">
-                  {isDraw ? "🤝" : "🏆"}
-                </span>
+                <Icon
+                  name={isDraw ? "handshake" : "trophy"}
+                  size={120}
+                  className="text-emerald-400 filter drop-shadow-[0_0_20px_rgba(52,211,153,0.5)]"
+                />
                 {!isDraw && (
                   <div className="absolute -top-4 -right-4 bg-white text-black px-4 py-1 rounded-full font-black text-xs uppercase italic tracking-widest rotate-12">
                     Winner
@@ -2543,21 +2607,37 @@
             <header className="flex items-center justify-between mb-4">
               <button
                 onClick={exitGame}
-                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800"
+                className="p-3 bg-gray-900 rounded-full text-gray-400 active:bg-gray-800 flex items-center justify-center"
               >
-                ⬅
+                <Icon name="chevron-left" size={20} />
               </button>
               <div className="text-center">
                 <h1 className="text-lg font-black text-emerald-400 uppercase tracking-tighter leading-tight">
                   {activeGame.replace("_", " ")}
                 </h1>
-                {isCompetitive && (
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                    Team {gameState.currentTeam}
-                    {activeGame === "TABOO" &&
-                      ` • P${gameState.currentPlayerIndex}`}
-                  </p>
-                )}
+                {isCompetitive &&
+                  (() => {
+                    const activeTeamIds =
+                      gameState.teams[gameState.currentTeam] || [];
+                    const activePID =
+                      activeTeamIds[
+                        gameState.currentPlayerIndex % activeTeamIds.length
+                      ];
+                    const activePlayer = players.find(
+                      (p) => p.id === activePID
+                    );
+                    const activePlayerName = activePlayer
+                      ? activePID === myId
+                        ? "You"
+                        : activePlayer.name
+                      : "Unknown";
+
+                    return (
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        Team {gameState.currentTeam} • {activePlayerName}
+                      </p>
+                    );
+                  })()}
               </div>
               <div className="w-12 h-12 flex items-center justify-center bg-gray-900 rounded-full font-black text-emerald-500 border border-emerald-500/20">
                 {gameState.turnScore}
@@ -2577,9 +2657,9 @@
                 <div className="flex items-center justify-center gap-4">
                   <button
                     onClick={togglePause}
-                    className="p-3 bg-white/10 rounded-full hover:bg-white/20 active:scale-90 transition-all font-black text-white"
+                    className="p-3 bg-white/10 rounded-full hover:bg-white/20 active:scale-90 transition-all font-black text-white flex items-center justify-center"
                   >
-                    {isActive ? "⏸" : "▶"}
+                    <Icon name={isActive ? "pause" : "play"} size={24} />
                   </button>
                   <div className="flex flex-col">
                     <span
@@ -2656,7 +2736,11 @@
                           ? "Observing Round..."
                           : "Teammate is guessing!"}
                       </p>
-                      <div className="mt-4 text-4xl">🫣</div>
+                      <Icon
+                        name="eye-off"
+                        size={48}
+                        className="text-gray-700 mt-4 opacity-50"
+                      />
                     </div>
                   );
                 }
@@ -2687,7 +2771,11 @@
                               key={i}
                               className="flex items-center justify-center gap-2 text-lg font-semibold text-gray-400 italic"
                             >
-                              <span className="text-red-500 text-xs">✖</span>
+                              <Icon
+                                name="x"
+                                size={12}
+                                className="text-red-500"
+                              />
                               <span>{f}</span>
                             </div>
                           ))}
@@ -2712,7 +2800,11 @@
                   const isHost = role === "gm";
                   const activeTeamIds =
                     gameState.teams[gameState.currentTeam] || [];
-                  const isActivePlayer = activeTeamIds[0] === myId;
+                  const activePID =
+                    activeTeamIds[
+                      gameState.currentPlayerIndex % activeTeamIds.length
+                    ];
+                  const isActivePlayer = activePID === myId;
                   const isTeammate =
                     activeTeamIds.includes(myId) && !isActivePlayer;
 
@@ -2729,7 +2821,7 @@
                               : "bg-gray-800 text-white active:bg-gray-700"
                           }`}
                         >
-                          PASS ⏩
+                          PASS <Icon name="skip-forward" size={16} />
                         </button>
                         <button
                           onClick={handleCorrect}
@@ -2740,7 +2832,7 @@
                               : "bg-emerald-500 text-black active:scale-95"
                           }`}
                         >
-                          CORRECT ✅
+                          CORRECT <Icon name="check-circle" size={24} />
                         </button>
                       </div>
                     );
@@ -2763,7 +2855,11 @@
                         <p className="text-blue-500 font-black uppercase tracking-widest text-xs animate-pulse">
                           Guess the word!
                         </p>
-                        <span className="text-2xl block mt-2">🤔</span>
+                        <Icon
+                          name="help-circle"
+                          size={48}
+                          className="text-blue-500 mt-2 animate-pulse opacity-50"
+                        />
                       </div>
                     );
                   } else {
@@ -2773,7 +2869,11 @@
                         <p className="text-gray-500 font-black uppercase tracking-widest text-xs animate-pulse">
                           Observing...
                         </p>
-                        <span className="text-2xl block mt-2">👀</span>
+                        <Icon
+                          name="eye"
+                          size={48}
+                          className="text-gray-500 mt-2 animate-pulse opacity-50"
+                        />
                       </div>
                     );
                   }
