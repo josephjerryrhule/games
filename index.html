@@ -426,12 +426,29 @@
                     players.map((p, i) => (
                       <div
                         key={i}
-                        className="bg-gray-900/50 p-3 rounded-xl flex items-center justify-between border border-gray-800"
+                        className={`bg-gray-900/50 p-3 rounded-xl flex items-center justify-between border ${
+                          p.online ? "border-gray-800" : "border-rose-500/20"
+                        }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-white font-bold text-sm">
+                          <div
+                            className={`w-2 h-2 rounded-full ${
+                              p.online
+                                ? "bg-emerald-500 animate-pulse"
+                                : "bg-gray-700"
+                            }`}
+                          />
+                          <span
+                            className={`text-sm font-bold ${
+                              p.online ? "text-white" : "text-gray-500"
+                            }`}
+                          >
                             {p.name}
+                            {!p.online && (
+                              <span className="ml-2 text-[10px] text-gray-600">
+                                OFFLINE
+                              </span>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -1766,6 +1783,7 @@
           TRUTH_LIE: [],
         });
         const timerRef = useRef(null);
+        const updatedTeamsRef = useRef(null);
 
         // --- Effects for Networking ---
 
@@ -1797,6 +1815,7 @@
               setConnections((prev) => [...prev, conn]);
 
               setPlayers((prev) => {
+                const playerName = conn.metadata?.name || "Unknown";
                 const existingPlayer = prev.find((p) => p.name === playerName);
                 let updated;
 
@@ -1819,11 +1838,17 @@
                         );
                       }
                     });
+                    updatedTeamsRef.current = newTeams;
                     return { ...prevGS, teams: newTeams };
                   });
+                  updated = prev.map((p) =>
+                    p.name === playerName
+                      ? { ...p, id: conn.peer, online: true }
+                      : p
+                  );
                 } else {
                   // NEW PLAYER
-                  updated = [...prev, newPlayer];
+                  updated = [...prev, { ...newPlayer, online: true }];
                 }
 
                 // Broadcast new player list to ALL connections using ref
@@ -1873,6 +1898,11 @@
                   }));
                   setTimeLeft(data.time || 30);
                   setIsActive(true);
+                  playActionSound("correct");
+                } else if (data.action === "end") {
+                  setIsActive(false);
+                  setGameState((prev) => ({ ...prev, phase: "summary" }));
+                  playActionSound("error");
                 } else if (data.action === "roll") {
                   setGameState((prev) => ({
                     ...prev,
@@ -1909,9 +1939,11 @@
                 (c) => c.peer !== conn.peer
               );
 
-              // Remove player
+              // Mark player as offline but DON'T remove from players list
               setPlayers((prev) => {
-                const updated = prev.filter((p) => p.id !== conn.peer);
+                const updated = prev.map((p) =>
+                  p.id === conn.peer ? { ...p, online: false } : p
+                );
                 // Broadcast update using ref
                 const payload = { type: "UPDATE_PLAYERS", players: updated };
                 connectionsRef.current.forEach((c) => c.send(payload));
@@ -1982,9 +2014,11 @@
                   }));
                   setTimeLeft(data.time || 30);
                   setIsActive(true);
+                  playActionSound("correct");
                 } else if (data.action === "end") {
                   setIsActive(false);
                   setGameState((prev) => ({ ...prev, phase: "summary" }));
+                  playActionSound("error");
                 } else if (data.action === "roll") {
                   setGameState((prev) => ({
                     ...prev,
@@ -2072,6 +2106,7 @@
           }
 
           setActiveGame(gameKey);
+          updatedTeamsRef.current = newTeams;
           setGameState((prev) => ({
             ...prev,
             teams: newTeams,
@@ -2188,6 +2223,7 @@
           setGameState((prev) => ({ ...prev, phase: "playing", turnScore: 0 }));
           setTimeLeft(time);
           setIsActive(true);
+          playActionSound("correct");
 
           // Broadcast START_TURN: Player sends to Host, Host broadcasts to all
           const payload = { type: "SYNC_TURN_ACTION", action: "start", time };
@@ -2201,10 +2237,15 @@
         const endTurn = () => {
           setIsActive(false);
           setGameState((prev) => ({ ...prev, phase: "summary" }));
+          playActionSound("error");
 
-          // Broadcast END_TURN to all players
+          // Broadcast END_TURN
           const payload = { type: "SYNC_TURN_ACTION", action: "end" };
-          connectionsRef.current.forEach((c) => c.send(payload));
+          if (role === "gm") {
+            connectionsRef.current.forEach((c) => c.send(payload));
+          } else if (myConn) {
+            myConn.send(payload);
+          }
         };
 
         const togglePause = () => {
