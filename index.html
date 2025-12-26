@@ -1693,6 +1693,24 @@
         ],
       };
 
+      // --- Audio Assets ---
+      const SOUNDS = {
+        correct:
+          "https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3",
+        error:
+          "https://assets.mixkit.co/active_storage/sfx/2805/2805-preview.mp3",
+      };
+
+      const playActionSound = (type) => {
+        try {
+          const audio = new Audio(SOUNDS[type]);
+          audio.volume = 0.4;
+          audio.play().catch((e) => console.log("Audio play failed:", e));
+        } catch (e) {
+          console.error("Sound error:", e);
+        }
+      };
+
       // --- State ---
       const App = () => {
         const [appMode, setAppMode] = useState("landing"); // landing, lobby, game
@@ -1728,6 +1746,18 @@
         const [timeLeft, setTimeLeft] = useState(0);
         const [isActive, setIsActive] = useState(false);
         const [isRolling, setIsRolling] = useState(false);
+
+        // Refs for networking consistency
+        const gameStateRef = useRef(gameState);
+        const currentCardRef = useRef(currentCard);
+
+        useEffect(() => {
+          gameStateRef.current = gameState;
+        }, [gameState]);
+
+        useEffect(() => {
+          currentCardRef.current = currentCard;
+        }, [currentCard]);
 
         // Other refs/state
         const [usedIndices, setUsedIndices] = useState({
@@ -1769,10 +1799,64 @@
               setConnections((prev) => [...prev, conn]);
 
               setPlayers((prev) => {
-                const updated = [...prev, newPlayer];
+                const existingPlayer = prev.find((p) => p.name === playerName);
+                let updated;
+
+                if (existingPlayer) {
+                  // REJOIN LOGIC
+                  console.log(
+                    `Player ${playerName} is rejoining. Remapping ${existingPlayer.id} -> ${conn.peer}`
+                  );
+                  updated = prev.map((p) =>
+                    p.name === playerName ? { ...p, id: conn.peer } : p
+                  );
+
+                  // Update teams with new ID
+                  setGameState((prevGS) => {
+                    const newTeams = { ...prevGS.teams };
+                    Object.keys(newTeams).forEach((teamNum) => {
+                      if (Array.isArray(newTeams[teamNum])) {
+                        newTeams[teamNum] = newTeams[teamNum].map((id) =>
+                          id === existingPlayer.id ? conn.peer : id
+                        );
+                      }
+                    });
+                    return { ...prevGS, teams: newTeams };
+                  });
+                } else {
+                  // NEW PLAYER
+                  updated = [...prev, newPlayer];
+                }
+
                 // Broadcast new player list to ALL connections using ref
                 const payload = { type: "UPDATE_PLAYERS", players: updated };
                 connectionsRef.current.forEach((c) => c.send(payload));
+
+                // If game is active, sync rejoining player immediately
+                if (activeGame) {
+                  const syncPayload = {
+                    type: "SYNC_GAME_STATE",
+                    gameState: gameStateRef.current, // Use a ref for immediate state
+                    card: currentCardRef.current,
+                  };
+                  conn.send(syncPayload);
+
+                  // Also send START_GAME to ensure they are on the game screen
+                  const startPayload = {
+                    type: "START_GAME",
+                    game: activeGame,
+                    teams:
+                      updatedTeamsRef.current || gameStateRef.current.teams,
+                    options: {
+                      teamSize: gameStateRef.current.teamSize,
+                      maxRounds: gameStateRef.current.maxRounds,
+                    },
+                    phase: gameStateRef.current.phase,
+                    initialCard: currentCardRef.current,
+                  };
+                  conn.send(startPayload);
+                }
+
                 return updated;
               });
             });
@@ -1797,6 +1881,10 @@
                     dieRoll: data.dieRoll,
                     hasRolled: true,
                   }));
+                } else if (data.action === "correct") {
+                  playActionSound("correct");
+                } else if (data.action === "pass") {
+                  playActionSound("error");
                 } else if (data.action === "pause") {
                   setIsActive(false);
                 } else if (data.action === "resume") {
@@ -1906,6 +1994,7 @@
                     hasRolled: true,
                   }));
                 } else if (data.action === "correct") {
+                  playActionSound("correct");
                   if (data.score !== undefined) {
                     setGameState((prev) => ({
                       ...prev,
@@ -1916,6 +2005,7 @@
                     setCurrentCard(data.card);
                   }
                 } else if (data.action === "pass") {
+                  playActionSound("error");
                   if (data.card !== undefined) {
                     setCurrentCard(data.card);
                   }
@@ -2126,6 +2216,7 @@
         };
 
         const handleCorrect = () => {
+          playActionSound("correct");
           const newScore = gameState.turnScore + 1;
           setGameState((prev) => ({ ...prev, turnScore: newScore }));
 
@@ -2149,6 +2240,7 @@
         };
 
         const handlePass = () => {
+          playActionSound("error");
           // Generate next card (no score change)
           const gameData = GAMES_DATA[activeGame];
           let nextCard = null;
