@@ -2097,8 +2097,9 @@
 
         const handleStartGame = (gameKey, options = {}) => {
           // Shuffle and Assign Teams
-          // HOST IS EXCLUDED -> Only shuffle 'players' list
-          const shuffled = [...players].sort(() => 0.5 - Math.random());
+          // HOST IS EXCLUDED -> Only shuffle 'online' players
+          const onlinePlayers = players.filter((p) => p.online);
+          const shuffled = [...onlinePlayers].sort(() => 0.5 - Math.random());
 
           let newTeams;
           if (gameKey === "TABOO" && options.teamSize) {
@@ -2458,7 +2459,7 @@
         };
 
         const syncPlayerToGame = (player) => {
-          if (role !== "gm" || !activeGame || !player) return;
+          if (role !== "gm" || !activeGame || !player || !player.online) return;
 
           const conn = connectionsRef.current.find((c) => c.peer === player.id);
           if (!conn) return;
