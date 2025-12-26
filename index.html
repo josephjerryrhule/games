@@ -86,14 +86,24 @@
 
         useEffect(() => {
           if (iconRef.current && window.lucide) {
-            const iconElement = window.lucide.icons[name];
-            if (iconElement) {
-              iconRef.current.innerHTML = iconElement.toSvg({
+            // Clear previous content
+            iconRef.current.innerHTML = "";
+
+            // Create a placeholder i element for lucide
+            const i = document.createElement("i");
+            // Map kebab-case to PascalCase for the attribute if needed,
+            // but lucide.createIcons usually handles the name mapping if we pass icons object.
+            i.setAttribute("data-lucide", name);
+            iconRef.current.appendChild(i);
+
+            window.lucide.createIcons({
+              attrs: {
                 width: size,
                 height: size,
                 "stroke-width": strokeWidth,
-              });
-            }
+              },
+              icons: window.lucide.icons,
+            });
           }
         }, [name, size, strokeWidth]);
 
@@ -1958,6 +1968,8 @@
             currentPlayerIndex: 0,
             team1PlayerIndex: 0,
             team2PlayerIndex: 0,
+            team1Score: 0,
+            team2Score: 0,
             turnScore: 0,
             dieRoll: 0,
             hasRolled: false,
@@ -2079,7 +2091,7 @@
           const newScore = gameState.turnScore + 1;
           setGameState((prev) => ({ ...prev, turnScore: newScore }));
 
-          // Generate next card
+          // Always generate next card for 30s and Taboo
           const gameData = GAMES_DATA[activeGame];
           let nextCard = null;
           if (gameData && gameData.length > 0) {
@@ -2099,7 +2111,7 @@
         };
 
         const handlePass = () => {
-          // Generate next card
+          // Generate next card (no score change)
           const gameData = GAMES_DATA[activeGame];
           let nextCard = null;
           if (gameData && gameData.length > 0) {
@@ -2128,18 +2140,25 @@
             let nextTeamNum = prev.currentTeam;
             let nextPlayerIndex = prev.currentPlayerIndex;
             let nextRoundNum = prev.round;
+            let nextT1Idx = prev.team1PlayerIndex || 0;
+            let nextT2Idx = prev.team2PlayerIndex || 0;
 
             if (activeGame === "THIRTY_SECONDS") {
               const movement = Math.max(0, prev.turnScore - prev.dieRoll);
               if (isTeam1) {
                 newT1Score += movement;
                 if (newT1Score >= prev.gameGoal) winner = "Team 1";
+                nextT1Idx = (nextT1Idx + 1) % (prev.teams[1]?.length || 1);
+                nextTeamNum = 2;
+                nextPlayerIndex = nextT2Idx;
               } else {
                 newT2Score += movement;
                 if (newT2Score >= prev.gameGoal) winner = "Team 2";
+                nextT2Idx = (nextT2Idx + 1) % (prev.teams[2]?.length || 1);
+                nextTeamNum = 1;
+                nextPlayerIndex = nextT1Idx;
+                nextRoundNum = prev.round + 1;
               }
-              nextTeamNum = isTeam1 ? 2 : 1;
-              nextRoundNum = !isTeam1 ? prev.round + 1 : prev.round;
             } else if (activeGame === "TABOO") {
               if (isTeam1) newT1Score += prev.turnScore;
               else newT2Score += prev.turnScore;
@@ -2149,9 +2168,9 @@
                 nextPlayerIndex = prev.currentPlayerIndex + 1;
               }
 
-              const newVerifierIndex = prev.verifierIndex + 1;
+              const newVerifierIndex = (prev.verifierIndex || 0) + 1;
 
-              if (nextPlayerIndex >= prev.teams[1].length) {
+              if (nextPlayerIndex >= (prev.teams[1]?.length || 1)) {
                 nextPlayerIndex = 0;
                 nextRoundNum = prev.round + 1;
               }
@@ -2172,9 +2191,9 @@
                 team1Score: newT1Score,
                 team2Score: newT2Score,
                 turnScore: 0,
-                hasRolled: false,
                 dieRoll: 0,
-                winner: winner,
+                hasRolled: false,
+                winner,
               };
               return newGameState;
             }
@@ -2183,16 +2202,16 @@
               ...prev,
               currentTeam: nextTeamNum,
               currentPlayerIndex: nextPlayerIndex,
-              verifierIndex:
-                prev.verifierIndex + (activeGame === "TABOO" ? 1 : 0),
+              team1PlayerIndex: nextT1Idx,
+              team2PlayerIndex: nextT2Idx,
               round: nextRoundNum,
               phase: winner ? "winner" : "ready",
               team1Score: newT1Score,
               team2Score: newT2Score,
               turnScore: 0,
-              hasRolled: false,
               dieRoll: 0,
-              winner: winner,
+              hasRolled: false,
+              winner,
             };
             return newGameState;
           });
@@ -2300,6 +2319,24 @@
                 <p className="text-rose-500 font-black uppercase tracking-widest text-sm mt-4 animate-pulse">
                   {activePlayerName}'s Turn
                 </p>
+
+                {/* Show dice roll to teammates */}
+                {gameState.hasRolled &&
+                  activeGame === "THIRTY_SECONDS" &&
+                  (isActiveTeam || role === "gm") && (
+                    <div className="mt-4 flex flex-col items-center gap-2 animate-bounce-in">
+                      <p className="text-[10px] uppercase font-bold text-gray-500 tracking-widest">
+                        {isActivePlayer
+                          ? "You rolled"
+                          : `${activePlayerName} rolled`}
+                      </p>
+                      <div className="bg-white/10 w-12 h-12 rounded-2xl border border-white/20 flex items-center justify-center">
+                        <span className="text-2xl font-black text-white">
+                          {gameState.dieRoll}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                 {/* Team Members Display */}
                 <div className="flex justify-center gap-8 py-4">
