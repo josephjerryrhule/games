@@ -1806,6 +1806,15 @@
                 // Relay to all other players
                 connectionsRef.current.forEach((c) => c.send(data));
               }
+
+              if (data.type === "RETURN_TO_LOBBY") {
+                setActiveGame(null);
+                setCurrentCard(null);
+                setIsActive(false);
+                setTimeLeft(0);
+                setGameState((prev) => ({ ...prev, phase: "setup" }));
+                setAppMode("lobby");
+              }
             });
 
             conn.on("close", () => {
@@ -1915,6 +1924,15 @@
                 } else if (data.action === "resume") {
                   setIsActive(true);
                 }
+              }
+
+              if (data.type === "RETURN_TO_LOBBY") {
+                setActiveGame(null);
+                setCurrentCard(null);
+                setIsActive(false);
+                setTimeLeft(0);
+                setGameState((prev) => ({ ...prev, phase: "setup" }));
+                setAppMode("lobby");
               }
               // Handle other game state syncs here
             });
@@ -2257,6 +2275,12 @@
         };
 
         const exitGame = () => {
+          // Broadcast to all players if Host
+          if (role === "gm") {
+            const payload = { type: "RETURN_TO_LOBBY" };
+            connectionsRef.current.forEach((c) => c.send(payload));
+          }
+
           setActiveGame(null);
           setCurrentCard(null);
           setIsActive(false);
