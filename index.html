@@ -1761,6 +1761,7 @@
         const [timeLeft, setTimeLeft] = useState(0);
         const [isActive, setIsActive] = useState(false);
         const [isRolling, setIsRolling] = useState(false);
+        const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
         // Refs for networking consistency
         const gameStateRef = useRef(gameState);
@@ -1784,6 +1785,11 @@
         });
         const timerRef = useRef(null);
         const updatedTeamsRef = useRef(null);
+        const activeGameRef = useRef(null);
+
+        useEffect(() => {
+          activeGameRef.current = activeGame;
+        }, [activeGame]);
 
         // --- Effects for Networking ---
 
@@ -1856,7 +1862,8 @@
                 connectionsRef.current.forEach((c) => c.send(payload));
 
                 // If game is active, sync rejoining player immediately
-                if (activeGame) {
+                const currentActiveGame = activeGameRef.current;
+                if (currentActiveGame) {
                   const syncPayload = {
                     type: "SYNC_GAME_STATE",
                     gameState: gameStateRef.current, // Use a ref for immediate state
@@ -1867,7 +1874,7 @@
                   // Also send START_GAME to ensure they are on the game screen
                   const startPayload = {
                     type: "START_GAME",
-                    game: activeGame,
+                    game: currentActiveGame,
                     teams:
                       updatedTeamsRef.current || gameStateRef.current.teams,
                     options: {
@@ -1876,6 +1883,7 @@
                     },
                     phase: gameStateRef.current.phase,
                     initialCard: currentCardRef.current,
+                    gameState: gameStateRef.current, // Added to preserve state
                   };
                   conn.send(startPayload);
                 }
@@ -1934,6 +1942,20 @@
             });
 
             conn.on("close", () => {
+              // Check if disconnected player was the active one
+              const gs = gameStateRef.current;
+              if (gs.phase === "playing") {
+                const activeTeamIds = gs.teams[gs.currentTeam] || [];
+                if (activeTeamIds.length > 0) {
+                  const activePID =
+                    activeTeamIds[gs.currentPlayerIndex % activeTeamIds.length];
+                  if (activePID === conn.peer) {
+                    console.log("Active player disconnected. Ending turn.");
+                    endTurn();
+                  }
+                }
+              }
+
               // Remove connection from ref
               connectionsRef.current = connectionsRef.current.filter(
                 (c) => c.peer !== conn.peer
@@ -1976,20 +1998,23 @@
                 setAppMode("game");
                 setActiveGame(data.game);
 
-                // If options are provided (like Taboo team size), we need to respect them if they aren't part of gameState default
-                // But gameState spread below handles it if data.options passed appropriately or mapped
-
-                setGameState((prev) => ({
-                  ...prev,
-                  phase: data.phase || "ready",
-                  teams: data.teams,
-                  teamSize: data.options?.teamSize || prev.teamSize,
-                  round: 1,
-                  turnScore: 0,
-                  dieRoll: 0,
-                  hasRolled: false,
-                  winner: null,
-                }));
+                if (data.gameState) {
+                  // Use existing game state if provided (rejoin)
+                  setGameState(data.gameState);
+                } else {
+                  // Initial start logic
+                  setGameState((prev) => ({
+                    ...prev,
+                    phase: data.phase || "ready",
+                    teams: data.teams,
+                    teamSize: data.options?.teamSize || prev.teamSize,
+                    round: 1,
+                    turnScore: 0,
+                    dieRoll: 0,
+                    hasRolled: false,
+                    winner: null,
+                  }));
+                }
 
                 if (data.initialCard) {
                   setCurrentCard(data.initialCard);
@@ -2430,6 +2455,27 @@
           // Return to lobby if networked
           if (peer) setAppMode("lobby");
           else setAppMode("landing");
+        };
+
+        const syncPlayerToGame = (player) => {
+          if (role !== "gm" || !activeGame || !player) return;
+
+          const conn = connectionsRef.current.find((c) => c.peer === player.id);
+          if (!conn) return;
+
+          const startPayload = {
+            type: "START_GAME",
+            game: activeGame,
+            teams: updatedTeamsRef.current || gameState.teams,
+            options: {
+              teamSize: gameState.teamSize,
+              maxRounds: gameState.maxRounds,
+            },
+            phase: gameState.phase,
+            initialCard: currentCard,
+            gameState: gameState,
+          };
+          conn.send(startPayload);
         };
 
         // --- Render Logic ---
@@ -3115,11 +3161,107 @@
                 </div>
               )}
             </div>
+
+            {role === "gm" && (
+              <PlayerManagementTray
+                players={players}
+                isOpen={isDrawerOpen}
+                onToggle={() => setIsDrawerOpen(!isDrawerOpen)}
+                onSyncPlayer={syncPlayerToGame}
+              />
+            )}
           </div>
         );
       };
 
       // --- SUB-COMPONENTS ---
+
+      const PlayerManagementTray = ({
+        players,
+        isOpen,
+        onToggle,
+        onSyncPlayer,
+      }) => {
+        if (!isOpen) {
+          return (
+            <button
+              onClick={onToggle}
+              className="fixed bottom-6 right-6 p-4 bg-gray-900 border border-emerald-500/50 rounded-full shadow-2xl active:scale-90 transition-all z-50 flex items-center justify-center gap-2"
+            >
+              <div className="relative">
+                <Icon name="users" size={24} className="text-emerald-500" />
+                {players.some((p) => !p.online) && (
+                  <div className="absolute -top-1 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900" />
+                )}
+              </div>
+              <span className="text-xs font-black text-white uppercase tracking-tighter">
+                Players
+              </span>
+            </button>
+          );
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center pointer-events-none p-4">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+              onClick={onToggle}
+            />
+            <div className="bg-gray-950 border border-gray-800 w-full max-w-md rounded-[2.5rem] shadow-2xl relative pointer-events-auto overflow-hidden animate-fade-in">
+              <div className="p-6 border-b border-gray-900 flex justify-between items-center">
+                <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">
+                  Manage Players
+                </h3>
+                <button
+                  onClick={onToggle}
+                  className="p-2 bg-gray-900 rounded-full text-gray-400"
+                >
+                  <Icon name="x" size={20} />
+                </button>
+              </div>
+              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3">
+                {players.map((p, i) => (
+                  <div
+                    key={i}
+                    className="bg-gray-900/50 p-4 rounded-3xl flex items-center justify-between border border-gray-800"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          p.online
+                            ? "bg-emerald-500 animate-pulse"
+                            : "bg-rose-500"
+                        }`}
+                      />
+                      <div>
+                        <p className="text-white font-black text-sm uppercase">
+                          {p.name}
+                        </p>
+                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                          {p.online ? "Connected" : "Disconnected / In Lobby"}
+                        </p>
+                      </div>
+                    </div>
+                    {p.online && (
+                      <button
+                        onClick={() => onSyncPlayer(p)}
+                        className="bg-emerald-500 text-black font-black px-4 py-2 rounded-xl text-[10px] uppercase tracking-tighter shadow-lg active:scale-95 transition-all"
+                      >
+                        Add to Game
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="p-6 bg-emerald-500/5 border-t border-emerald-500/10">
+                <p className="text-[10px] text-emerald-500/60 font-medium text-center uppercase tracking-widest">
+                  Tap "Add to Game" if a player is stuck in the lobby
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      };
 
       const Scoreboard = ({ t1, t2, goal, isRace }) => (
         <div className="w-full bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4 max-w-lg m-auto">
