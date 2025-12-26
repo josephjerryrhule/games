@@ -1797,6 +1797,10 @@
                     dieRoll: data.dieRoll,
                     hasRolled: true,
                   }));
+                } else if (data.action === "pause") {
+                  setIsActive(false);
+                } else if (data.action === "resume") {
+                  setIsActive(true);
                 }
 
                 // Relay to all other players
@@ -1906,6 +1910,10 @@
                   if (data.card !== undefined) {
                     setCurrentCard(data.card);
                   }
+                } else if (data.action === "pause") {
+                  setIsActive(false);
+                } else if (data.action === "resume") {
+                  setIsActive(true);
                 }
               }
               // Handle other game state syncs here
@@ -2084,7 +2092,19 @@
         };
 
         const togglePause = () => {
-          setIsActive((prev) => !prev);
+          const nextActive = !isActive;
+          setIsActive(nextActive);
+
+          // Broadcast pause/resume
+          const payload = {
+            type: "SYNC_TURN_ACTION",
+            action: nextActive ? "resume" : "pause",
+          };
+          if (role === "gm") {
+            connectionsRef.current.forEach((c) => c.send(payload));
+          } else if (myConn) {
+            myConn.send(payload);
+          }
         };
 
         const handleCorrect = () => {
